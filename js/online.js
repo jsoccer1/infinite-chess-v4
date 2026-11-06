@@ -79,7 +79,13 @@ const App = (() => {
     document.querySelectorAll('[data-online]').forEach((el) => (el.hidden = !on));
     renderHeader(); renderHome(); GameUI.refresh();
   }
+  function setMenu(open) {
+    $('topbar').classList.toggle('open', open);
+    $('menu-btn').setAttribute('aria-expanded', String(open));
+    $('menu-btn').setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
   function renderHeader() {
+    $('menu-signout').hidden = !(online && user);
     const a = $('user-area');
     if (!online) { a.innerHTML = ''; return; }
     if (!user) { a.innerHTML = '<button type="button" class="btn primary small" id="hdr-signin">Sign in</button>'; $('hdr-signin').onclick = () => showAuth('signin'); return; }
@@ -98,7 +104,11 @@ const App = (() => {
   // ---------- init ----------
   async function init() {
     GameUI.setHooks({ toast, isSignedIn: () => !!(online && user), onlineAvailable: () => online, fetchPlaybook, onLocalGameOver });
-    document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => navigate(b.dataset.nav)));
+    document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => { setMenu(false); navigate(b.dataset.nav); }));
+    $('menu-btn').addEventListener('click', (e) => { e.stopPropagation(); setMenu(!$('topbar').classList.contains('open')); });
+    document.addEventListener('click', (e) => { if (!e.target.closest('#topnav')) setMenu(false); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+    $('menu-signout').addEventListener('click', () => { setMenu(false); if (sb) withButton(null, async () => { closeGame(); await net(sb.auth.signOut()); }); });
     $('home-resume').addEventListener('click', (e) => withButton(e.currentTarget, () => openGame(store.get(ACTIVE_KEY))));
     wireAuth(); wireProfile(); wireLobbies(); wireGame();
     setOnlineUI(false);

@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Infinite Chess</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Infinite Chess">
+<meta name="theme-color" content="#e6e7ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1c22" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,14 +27,17 @@
 </div>
 
 <div id="net-banner" class="net-banner" role="status" hidden></div>
-<header class="topbar">
-  <button type="button" class="brand-btn" data-nav="home">Infinite Chess</button>
-  <nav class="topnav" aria-label="Main">
+<header class="topbar" id="topbar">
+  <button type="button" class="brand-btn" data-nav="home"><img src="favicon.svg" alt="" width="24" height="24"><span>Infinite Chess</span></button>
+  <nav class="topnav" id="topnav" aria-label="Main">
     <button type="button" data-nav="bot">Play vs Bot</button>
     <button type="button" data-nav="online" data-online hidden>Play Online</button>
     <button type="button" data-nav="leaderboard" data-online hidden>Leaderboard</button>
+    <button type="button" data-nav="profile" class="only-mobile" data-online hidden>Profile</button>
     <button type="button" data-nav="howto">How to Play</button>
+    <button type="button" id="menu-signout" class="only-mobile" hidden>Sign out</button>
   </nav>
+  <button type="button" class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="topnav" aria-label="Open menu"><span></span><span></span><span></span></button>
   <span id="net-spinner" class="spinner" role="status" aria-label="Loading" hidden></span>
   <div id="user-area"></div>
 </header>
