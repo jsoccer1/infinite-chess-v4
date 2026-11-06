@@ -545,9 +545,14 @@ const AI = (() => {
 
   // Returns the chosen move. Random tie-break among equally scored moves.
   // `preferred` (optional): move strings to search first, e.g. playbook moves. Only changes search order.
-  function chooseMove(s, depth, preferred) {
-    const moves = R.legalMoves(s);
+  // `avoid` (optional): move strings the bot should skip at the root when it has other moves.
+  function chooseMove(s, depth, preferred, avoid) {
+    let moves = R.legalMoves(s);
     if (!moves.length) return null;
+    if (avoid && avoid.length) {
+      const kept = moves.filter((m) => !avoid.includes(R.moveToString(m)));
+      if (kept.length) moves = kept;
+    }
     for (let i = moves.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [moves[i], moves[j]] = [moves[j], moves[i]]; }
     const scored = [];
     let alpha = -Infinity;

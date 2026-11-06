@@ -15,36 +15,42 @@ const GameUI = (() => {
 
   const st = {
     game: R.newGame(), moveStrs: [], entries: [], selected: null, targets: [], flipped: false, showNames: false,
-    humanColor: 'w', depth: 2, thinking: false, status: null, promo: null, anim: null, botNote: '',
+    humanColor: 'w', level: 'medium', thinking: false, status: null, promo: null, anim: null, botNote: '',
   };
   // session: the local game (vs a person or a bot) or an online game
   let session = { kind: 'local', opponent: 'human', tainted: false, reported: false, token: {} };
-  let hooks = { fetchPlaybook: null, onLocalGameOver: null, isSignedIn: () => false, toast: (m) => alert(m), onlineAvailable: () => false };
+  let hooks = { fetchPlaybook: null, onLocalGameOver: null, isSignedIn: () => false, toast: (m) => alert(m), onlineAvailable: () => false, botRating: () => null, myRating: () => null };
 
   // ---------- coordinate transforms ----------
   let view = { ox: 0, oy: 0, sc: 1, dpr: 1 };
   const MARGIN = 0.25;
+  // On phones held upright the figure-8 is turned 90 degrees so it can use the full screen width.
+  const portraitPhone = () => window.innerWidth <= 640 && window.innerHeight > window.innerWidth;
   function resize() {
     const wrap = canvas.parentElement;
     canvas.style.width = '0px'; canvas.style.height = '0px';   // measure the container, not the old canvas
     const cssW = wrap.clientWidth;
     if (!cssW) return;                                         // view hidden
-    const maxH = Math.max(260, window.innerHeight - 120);
-    const aspect = (Ge.BOARD_H + 2 * MARGIN) / (Ge.BOARD_W + 2 * MARGIN);
+    const rot = portraitPhone();
+    const bw = (rot ? Ge.BOARD_H : Ge.BOARD_W) + 2 * MARGIN, bh = (rot ? Ge.BOARD_W : Ge.BOARD_H) + 2 * MARGIN;
+    const aspect = bh / bw;
     let w = cssW, h = w * aspect;
-    if (h > maxH && window.innerWidth > 860) { h = maxH; w = h / aspect; }
+    const maxH = rot ? Math.max(300, window.innerHeight - 230) : Math.max(220, window.innerHeight - (window.innerHeight < 560 ? 40 : 120));
+    if (h > maxH && (rot || window.innerWidth > 860 || window.innerHeight < 560)) { h = maxH; w = h / aspect; }
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-    view = { ox: w / 2, oy: h / 2, sc: w / (Ge.BOARD_W + 2 * MARGIN), dpr };
+    view = { ox: w / 2, oy: h / 2, sc: w / bw, dpr, rot };
     draw();
   }
   function toScreen(p) {
-    const x = st.flipped ? -p.x : p.x, y = st.flipped ? -p.y : p.y;
+    let x = st.flipped ? -p.x : p.x, y = st.flipped ? -p.y : p.y;
+    if (view.rot) { const t = x; x = -y; y = t; }               // quarter turn: White's loop at the bottom
     return { x: view.ox + x * view.sc, y: view.oy - y * view.sc };
   }
   function fromScreen(sx, sy) {
     let x = (sx - view.ox) / view.sc, y = (view.oy - sy) / view.sc;
+    if (view.rot) { const t = y; y = -x; x = t; }
     if (st.flipped) { x = -x; y = -y; }
     return { x, y };
   }
@@ -135,7 +141,8 @@ const GameUI = (() => {
   }
 
   // ---------- game logic ----------
-  const LEVELS = { 1: 'easy', 2: 'medium', 3: 'hard' };
+  const DEPTH = { easy: 1, medium: 2, hard: 3, dynamic: 3 };
+  const LEVEL_NAME = { easy: 'Easy', medium: 'Medium', hard: 'Hard', dynamic: 'Dynamic' };
   const aiColor = () => (st.humanColor === 'w' ? 'b' : 'w');
   const sideName = (c) => (c === 'w' ? 'White' : 'Black');
   const colorWord = (c) => (c === 'w' ? 'white' : 'black');
@@ -221,7 +228,7 @@ const GameUI = (() => {
       if (vsBot() && st.status.over && !session.reported && hooks.onLocalGameOver) {
         session.reported = true;
         const r = gameResult();
-        hooks.onLocalGameOver({ level: LEVELS[st.depth], humanColor: colorWord(st.humanColor), moves: st.moveStrs.slice(),
+        hooks.onLocalGameOver({ level: st.level, humanColor: colorWord(st.humanColor), moves: st.moveStrs.slice(),
           result: r.result, reason: r.reason, entries: st.entries.slice(0, 200), rated: !session.tainted });
       }
       maybeAI();
@@ -241,8 +248,8 @@ const GameUI = (() => {
     st.thinking = true; render();
     const token = session.token;
     setTimeout(async () => {
-      let move = null, used = false, preferred = [];
-      const level = LEVELS[st.depth];
+      let move = null, used = false, preferred = [], avoid = [];
+      const level = st.level;
       if (level !== 'easy' && hooks.fetchPlaybook) {
         let rows = [];
         try { rows = (await hooks.fetchPlaybook(R.playbookKey(st.game))) || []; } catch (e) { rows = []; }
@@ -250,14 +257,25 @@ const GameUI = (() => {
         const legal = new Map(R.legalMoves(st.game).map((m) => [R.moveToString(m), m]));
         const cand = rows.filter((r) => legal.has(r.move)).map((r) => {
           const n = (r.wins || 0) + (r.losses || 0) + (r.draws || 0);
-          return { move: r.move, n, score: n ? ((r.wins || 0) + 0.5 * (r.draws || 0)) / n : 0 };
-        }).sort((a, b) => (b.score - a.score) || (b.n - a.n));
-        preferred = cand.map((c) => c.move);
-        const good = cand.filter((c) => c.n >= 3 && c.score >= 0.55);
-        if (good.length && (level === 'hard' || Math.random() < 0.7)) { move = legal.get(good[0].move); used = true; }
+          const score = n ? ((r.wins || 0) + 0.5 * (r.draws || 0)) / n : 0;
+          return { move: r.move, n, score, lcb: score - 0.5 / Math.sqrt(Math.max(n, 1)) };
+        });
+        if (level === 'dynamic') {
+          // Dynamic: trust any move with a solid record, skip moves that keep losing
+          cand.sort((a, b) => (b.lcb - a.lcb) || (b.n - a.n));
+          preferred = cand.map((c) => c.move);
+          avoid = cand.filter((c) => c.n >= 3 && c.score <= 0.25).map((c) => c.move);
+          const best = cand.find((c) => c.n >= 2 && c.lcb >= 0.35 && !avoid.includes(c.move));
+          if (best) { move = legal.get(best.move); used = true; }
+        } else {
+          cand.sort((a, b) => (b.score - a.score) || (b.n - a.n));
+          preferred = cand.map((c) => c.move);
+          const good = cand.filter((c) => c.n >= 3 && c.score >= 0.55);
+          if (good.length && (level === 'hard' || Math.random() < 0.7)) { move = legal.get(good[0].move); used = true; }
+        }
       }
       if (token !== session.token) return;
-      if (!move) move = AI.chooseMove(st.game, st.depth, preferred);
+      if (!move) move = AI.chooseMove(st.game, DEPTH[level], preferred, avoid);
       st.thinking = false;
       if (move) commit(move, { botNote: used ? 'Bot used its playbook' : '' }); else render();
     }, 60);
@@ -353,6 +371,8 @@ const GameUI = (() => {
     const s = st.status, g = st.game, online = session.kind === 'online';
     $('local-controls').hidden = online;
     $('online-controls').hidden = !online;
+    $('opp-block').hidden = online;
+    document.body.classList.toggle('in-online-game', online);
     let msg, sub = '';
     if (online && session.locked) { msg = session.lockMsg; sub = 'Input is stopped. Reload the page to resync.'; }
     else if (s.over) {
@@ -388,12 +408,20 @@ const GameUI = (() => {
     }
     if (!online) {
       $('undo').disabled = !h.length || st.thinking || !!st.anim;
+      $('m-undo').disabled = $('undo').disabled;
       $('ai-opts').hidden = !vsBot();
+      // "You vs Bot" line with ratings
+      const vs = $('vs-line');
+      if (vsBot()) {
+        const br = hooks.botRating(st.level), mr = hooks.myRating();
+        vs.innerHTML = `<span>${mr != null ? 'You \u00B7 ' + mr : 'You'}</span><b>vs</b><span>${LEVEL_NAME[st.level]} bot${br != null ? ' \u00B7 ' + br : ''}</span>`;
+        vs.hidden = false;
+      } else vs.hidden = true;
       let note = '';
       if (vsBot()) {
         if (!hooks.isSignedIn()) note = hooks.onlineAvailable() ? 'Playing as a guest: bot games are unrated and not saved. Sign in to play rated games.' : 'Bot games are unrated while online features are off.';
         else if (session.tainted) note = 'This game is unrated because undo was used or the settings changed mid-game.';
-        else note = 'Rated game. Wins against bots raise your rating, and harder bots give more points. Losses and draws against bots never lower your rating. Games under 20 moves are unrated.';
+        else note = 'Rated game. Beating a bot raises your rating, more for stronger bots. Losses and draws against bots never lower it. Games under 20 moves are unrated.';
       }
       $('rated-note').textContent = note;
       $('rated-note').hidden = !note;
@@ -428,6 +456,18 @@ const GameUI = (() => {
   });
   $('flip').addEventListener('click', () => { st.flipped = !st.flipped; draw(); });
   $('flip-online').addEventListener('click', () => { st.flipped = !st.flipped; draw(); });
+  // phone toolbar and the game settings sheet
+  function setSheet(open) {
+    document.body.classList.toggle('sheet-open', open);
+    $('settings-sheet').setAttribute('aria-hidden', String(!open && matchMedia('(max-width: 640px)').matches));
+  }
+  $('m-undo').addEventListener('click', () => $('undo').click());
+  $('m-flip').addEventListener('click', () => { st.flipped = !st.flipped; draw(); });
+  $('m-settings').addEventListener('click', () => setSheet(true));
+  $('sheet-done').addEventListener('click', () => setSheet(false));
+  $('sheet-backdrop').addEventListener('click', () => setSheet(false));
+  $('sheet-new').addEventListener('click', () => { setSheet(false); newLocal(); });
+  if (matchMedia('(max-width: 640px)').matches) $('moves-box').open = false;
   $('names').addEventListener('change', (e) => { st.showNames = e.target.checked; draw(); });
   $('opponent').addEventListener('change', (e) => {
     taint();
@@ -435,7 +475,7 @@ const GameUI = (() => {
     render(); maybeAI();
   });
   $('side').addEventListener('change', (e) => { taint(); st.humanColor = e.target.value; st.flipped = st.humanColor === 'b'; st.selected = null; st.targets = []; render(); maybeAI(); });
-  $('depth').addEventListener('change', (e) => { taint(); st.depth = +e.target.value; render(); });
+  $('depth').addEventListener('change', (e) => { taint(); st.level = e.target.value; render(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (st.promo) { st.promo = null; showPromo(false); } st.selected = null; st.targets = []; draw(); } });
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
   let rz = 0; window.addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(resize); });

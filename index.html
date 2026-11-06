@@ -4,17 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Infinite Chess</title>
-<link rel="icon" href="favicon.ico" sizes="32x32">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=4">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=4">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png?v=4">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=4">
+<link rel="shortcut icon" href="favicon.ico?v=4">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=4">
+<link rel="manifest" href="site.webmanifest?v=4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Infinite Chess">
+<meta name="application-name" content="Infinite Chess">
+<meta name="format-detection" content="telephone=no">
 <meta name="theme-color" content="#e6e7ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1c22" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css">
-<script src="config.js"></script>
+<link rel="stylesheet" href="css/style.css?v=4">
+<script src="config.js?v=4"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -28,7 +37,7 @@
 
 <div id="net-banner" class="net-banner" role="status" hidden></div>
 <header class="topbar" id="topbar">
-  <button type="button" class="brand-btn" data-nav="home"><img src="favicon.svg" alt="" width="24" height="24"><span>Infinite Chess</span></button>
+  <button type="button" class="brand-btn" data-nav="home"><img src="favicon.svg?v=4" alt="" width="26" height="26"><span id="app-title">Infinite Chess</span></button>
   <nav class="topnav" id="topnav" aria-label="Main">
     <button type="button" data-nav="bot">Play vs Bot</button>
     <button type="button" data-nav="online" data-online hidden>Play Online</button>
@@ -47,6 +56,12 @@
   <div class="home">
     <h1><img class="banner" src="assets/banner.jpg" alt=""><span class="sr">Infinite Chess</span></h1>
     <p class="byline">by Mark Colebank</p>
+    <div class="install-card" id="install-card" hidden>
+      <img src="apple-touch-icon.png?v=4" alt="" width="52" height="52">
+      <div><b>Get the Infinite Chess app</b><span>Add it to your Home Screen to play full screen, like any other app.</span></div>
+      <button type="button" class="btn primary" id="install-btn">Install</button>
+      <button type="button" class="install-x" id="install-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
     <div class="menu">
       <button type="button" class="primary" id="home-resume" hidden><b>Resume online game</b><span>Reconnect to your game in progress</span></button>
       <button type="button" class="primary" data-nav="bot"><b>Play vs Bot</b><span>Easy, Medium or Hard. Also two players on one device.</span></button>
@@ -73,8 +88,14 @@
     <div class="panel">
       <div class="block status">
         <span id="turn-chip" class="chip w" aria-hidden="true"></span>
-        <div><p id="status" aria-live="polite">White to move</p><p id="status-sub"></p></div>
+        <div class="status-text"><p id="status" aria-live="polite">White to move</p><p id="status-sub"></p></div>
+        <div class="m-toolbar" role="toolbar" aria-label="Game actions">
+          <button type="button" class="icon-btn" id="m-undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+          <button type="button" class="icon-btn" id="m-flip" aria-label="Flip board"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button>
+          <button type="button" class="icon-btn" id="m-settings" aria-label="Game settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
       </div>
+      <div class="vs-line" id="vs-line" hidden></div>
 
       <div id="online-controls" class="panel" hidden>
         <div class="block players" id="players"></div>
@@ -82,28 +103,17 @@
         <div class="row">
           <button type="button" class="btn danger" id="resign">Resign</button>
           <button type="button" class="btn primary" id="claim" hidden>Claim win (opponent left)</button>
-          <button type="button" class="btn" id="flip-online">Flip board</button>
+          <button type="button" class="btn desk-only" id="flip-online">Flip board</button>
         </div>
         <div><button type="button" class="btn small" id="leave-online">Leave (game continues)</button></div>
       </div>
 
       <div id="local-controls" class="panel">
-        <div class="block">
+        <div class="block desk-only">
           <div class="row">
             <button type="button" class="btn primary" id="new-game">New game</button>
             <button type="button" class="btn" id="undo">Undo</button>
             <button type="button" class="btn" id="flip">Flip board</button>
-          </div>
-        </div>
-        <div class="block">
-          <h2>Opponent</h2>
-          <div class="field"><label for="opponent">Play against</label>
-            <select id="opponent"><option value="human">Another person</option><option value="computer">Computer</option></select></div>
-          <div id="ai-opts" hidden>
-            <div class="field"><label for="side">You play</label>
-              <select id="side"><option value="w">White</option><option value="b">Black</option></select></div>
-            <div class="field"><label for="depth">Difficulty</label>
-              <select id="depth"><option value="1">Easy</option><option value="2" selected>Medium</option><option value="3">Hard</option></select></div>
           </div>
         </div>
         <p id="rated-note" hidden></p>
@@ -111,17 +121,31 @@
         <p id="bot-note" aria-live="polite"></p>
       </div>
 
-      <label class="check"><input type="checkbox" id="names"> Show cell names</label>
-      <div class="block">
-        <h2>Captured</h2>
+      <div class="sheet" id="settings-sheet" role="dialog" aria-label="Game settings">
+        <div class="sheet-head"><span class="grabber" aria-hidden="true"></span><h3>Game settings</h3><button type="button" class="btn small" id="sheet-done">Done</button></div>
+        <div class="block" id="opp-block">
+          <h2>Opponent</h2>
+          <div class="field"><label for="opponent">Play against</label>
+            <select id="opponent"><option value="human">Another person</option><option value="computer">Computer</option></select></div>
+          <div id="ai-opts" hidden>
+            <div class="field"><label for="side">You play</label>
+              <select id="side"><option value="w">White</option><option value="b">Black</option></select></div>
+            <div class="field"><label for="depth">Bot</label>
+              <select id="depth"><option value="easy">Easy (800)</option><option value="medium" selected>Medium (1100)</option><option value="hard">Hard (1400)</option><option value="dynamic">Dynamic (1400)</option></select></div>
+            <p class="bot-info" id="bot-info"></p>
+          </div>
+        </div>
+        <label class="check"><input type="checkbox" id="names"> Show cell names</label>
+        <button type="button" class="btn primary sheet-new" id="sheet-new">New game</button>
+      </div>
+
+      <details class="block moves-box" id="moves-box" open>
+        <summary><h2>Moves &amp; captures</h2></summary>
         <div class="caprow"><span>White</span><span class="list" id="cap-w"></span></div>
         <div class="caprow"><span>Black</span><span class="list" id="cap-b"></span></div>
-      </div>
-      <div class="block">
-        <h2>Moves</h2>
-        <p class="muted" id="moves-empty" style="margin:0">No moves yet. White starts in the left loop.</p>
+        <p class="muted" id="moves-empty" style="margin:8px 0 0">No moves yet. White starts in the left loop.</p>
         <ol id="moves"></ol>
-      </div>
+      </details>
     </div>
   </aside>
 </section>
@@ -184,6 +208,7 @@
         <div id="pf-avatar"></div>
         <div>
           <p class="hint">Signed in as <span id="pf-email"></span></p>
+          <button type="button" class="btn small" id="pf-signout" style="margin-top:8px">Sign out</button>
         </div>
       </div>
       <div class="stats" id="pf-stats"></div>
@@ -266,6 +291,29 @@
   </div>
 </section>
 
+<div class="sheet-backdrop" id="sheet-backdrop"></div>
+
+<nav class="tabbar" id="tabbar" aria-label="App">
+  <button type="button" data-nav="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></button>
+  <button type="button" data-nav="bot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21h6M8 18h8l-1-6h-6z"/><path d="M12 3v3M10.5 4.5h3"/><circle cx="12" cy="9" r="3"/></svg><span>Play</span></button>
+  <button type="button" data-nav="online" data-online hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span>Online</span></button>
+  <button type="button" data-nav="leaderboard" data-online hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg><span>Ranks</span></button>
+  <button type="button" data-nav="howto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h0"/></svg><span>Rules</span></button>
+</nav>
+
+<div class="overlay install-sheet" id="install-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="install-title">
+  <div class="dialog">
+    <div class="install-head"><img src="apple-touch-icon.png?v=4" alt="" width="60" height="60"><div><h2 id="install-title">Install Infinite Chess</h2><p class="hint">Full screen, its own icon, no browser bars.</p></div></div>
+    <ol class="install-steps">
+      <li><span class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg></span><div><b>Tap the Share button</b><span>In Safari it is at the bottom of the screen. On newer iPhones, tap <b>&hellip;</b> first, then <b>Share</b>.</span></div></li>
+      <li><span class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span><div><b>Choose &ldquo;Add to Home Screen&rdquo;</b><span>Scroll down the list if you don&rsquo;t see it.</span></div></li>
+      <li><span class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg></span><div><b>Tap Add</b><span>Infinite Chess appears on your Home Screen. Open it from there.</span></div></li>
+    </ol>
+    <p style="margin:16px 0 0;text-align:right"><button type="button" class="btn primary" id="install-close">Got it</button></p>
+    <div class="install-arrow" aria-hidden="true"></div>
+  </div>
+</div>
+
 <div class="overlay" id="promo" hidden role="dialog" aria-modal="true" aria-labelledby="promo-title">
   <div class="dialog">
     <h2 id="promo-title">Promote pawn to</h2>
@@ -295,10 +343,10 @@
 
 <div id="toasts" aria-live="polite"></div>
 
-<script src="js/engine.js"></script>
-<script src="js/tests.js"></script>
-<script src="js/avatars.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/online.js"></script>
+<script src="js/engine.js?v=4"></script>
+<script src="js/tests.js?v=4"></script>
+<script src="js/avatars.js?v=4"></script>
+<script src="js/ui.js?v=4"></script>
+<script src="js/online.js?v=4"></script>
 </body>
 </html>

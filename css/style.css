@@ -222,48 +222,141 @@ table.mini td { padding: 4px 0; }
 .howto-page p { line-height: 1.6; }
 .howto-page ul { padding-left: 1.2em; line-height: 1.6; }
 
-/* ================= favicon in the top bar, compact phone layout ================= */
-.brand-btn { display: inline-flex; align-items: center; gap: 8px; }
-.brand-btn img { border-radius: 6px; display: block; }
-.menu-btn, .only-mobile { display: none; }
+/* ================= brand icon, install prompt, shared bits ================= */
+.brand-btn { display: inline-flex; align-items: center; gap: 9px; }
+.brand-btn img { border-radius: 7px; display: block; }
+.menu-btn, .only-mobile, .tabbar, .m-toolbar, .sheet-head, .sheet-new, .sheet-backdrop, .install-arrow { display: none; }
 .topbar { top: env(safe-area-inset-top, 0px); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 16; background: var(--bg); }
+.status-text { flex: 1; min-width: 0; }
+.moves-box summary { list-style: none; cursor: pointer; }
+.moves-box summary::-webkit-details-marker { display: none; }
+.moves-box summary h2 { display: inline; }
+.vs-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+.vs-line b { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.vs-line span { color: var(--ink); font-weight: 600; }
+.bot-info { margin: 10px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.icon-btn svg, .tabbar svg, .step-ico svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+.install-card { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px 14px; text-align: left; margin: 22px auto 0; max-width: 560px; padding: 14px 40px 14px 14px; border-radius: 18px; background: linear-gradient(135deg, #0d2c5c, #12161f 70%); border: 1px solid #22406f; color: #fff; }
+.install-card img { border-radius: 12px; }
+.install-card b { display: block; font-size: 16px; }
+.install-card span { display: block; font-size: 13px; color: #b9c8de; margin-top: 2px; }
+.install-x { position: absolute; top: 6px; right: 8px; border: 0; background: none; color: #b9c8de; font-size: 22px; line-height: 1; cursor: pointer; padding: 4px; }
+.install-head { display: flex; gap: 14px; align-items: center; }
+.install-head img { border-radius: 14px; }
+.install-head h2 { margin: 0 0 2px; }
+.install-steps { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: s; }
+.install-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.install-steps li > div > b { display: block; }
+.install-steps span:not(.step-ico) { display: block; font-size: 14px; color: var(--muted); }
+.step-ico { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--bg); color: var(--accent); }
+.step-ico svg { width: 22px; height: 22px; }
+
+/* ================= phone: app shell ================= */
 @media (max-width: 640px) {
-  .topbar { flex-wrap: nowrap; gap: 8px; padding: 6px 12px; }
-  .brand-btn { font-size: 16px; min-width: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); -webkit-tap-highlight-color: transparent; }
+  button, canvas, .tabbar, .topbar, summary { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+  input, select, textarea { font-size: 16px !important; }   /* stops iOS zooming into fields */
+
+  /* top bar: icon + screen title on the left, avatar on the right */
+  .topbar { flex-wrap: nowrap; gap: 10px; padding: 8px 14px; border-bottom-color: transparent; }
+  .topnav, .menu-btn { display: none !important; }
+  .brand-btn { font-size: 19px; min-width: 0; letter-spacing: -0.02em; }
   .brand-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #net-spinner { order: 3; flex: none; }
-  #user-area { order: 4; margin-left: auto; gap: 6px; }
-  .menu-btn { order: 5; display: inline-flex; flex-direction: column; justify-content: center; gap: 4px; width: 38px; height: 38px; padding: 0 9px; border: 1px solid var(--hair); border-radius: 10px; background: var(--surface); cursor: pointer; flex: none; }
-  .menu-btn span { display: block; height: 2px; border-radius: 1px; background: var(--ink); transition: transform 0.2s, opacity 0.2s; }
-  .topbar.open .menu-btn span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
-  .topbar.open .menu-btn span:nth-child(2) { opacity: 0; }
-  .topbar.open .menu-btn span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
-  .topnav { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; gap: 0; padding: 6px 12px 12px; background: var(--bg); border-bottom: 1px solid var(--hair); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25); }
-  .topbar.open .topnav { display: flex; }
-  .topnav button { text-align: left; padding: 12px 8px; font-size: 16px; color: var(--ink); border-radius: 10px; }
-  .topnav .only-mobile { display: block; }
-  .user-chip { padding: 2px 9px 2px 2px; gap: 6px; }
+  #user-area { margin-left: auto; gap: 6px; }
+  .user-chip { padding: 2px 10px 2px 2px; gap: 6px; }
   .user-chip .uname, #hdr-signout { display: none; }
-  .btn.small#hdr-signin { padding: 6px 12px; }
-  .view { padding: 12px 12px 28px; }
   .net-banner { font-size: 12px; padding: 3px 10px; }
+
+  /* bottom tab bar */
+  .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 18; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); border-top: 1px solid var(--hair); }
+  .tabbar button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: none; color: var(--muted); font-size: 11px; font-weight: 600; padding: 4px 0; cursor: pointer; }
+  .tabbar button svg { width: 24px; height: 24px; }
+  .tabbar button.current { color: var(--accent); }
+
+  .view { padding: 10px 14px 24px; }
+  .view h2.title { font-size: 28px; margin: 6px 0 14px; }
+  .card { border-radius: 18px; padding: 16px; }
+
+  /* home */
+  .home .banner { border-radius: 14px; }
+  .home .byline { font-size: 14px; }
+  .menu { grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .menu button { padding: 14px; border-radius: 16px; min-height: 92px; }
+  .menu button b { font-size: 16px; }
+  .menu button span { font-size: 12.5px; }
+  .menu button.primary, #home-resume { grid-column: 1 / -1; min-height: 0; }
+  .install-card { grid-template-columns: auto 1fr; margin-top: 16px; }
+  .install-card .btn { grid-column: 1 / -1; width: 100%; padding: 11px; font-size: 16px; }
+
+  /* game screen: board edge to edge, one compact status row, everything else tucked away */
+  .view.game-grid { padding: 0 0 20px; gap: 0; grid-template-areas: "stage" "side"; }
+  .game-grid .brand { display: none; }
+  .stage { background: none; padding: 6px 4px 0; border-radius: 0; }
+  .hover { display: none; }
+  .game-grid > aside { padding: 0 14px; gap: 12px; }
+  .game-grid > aside .panel { gap: 12px; }
+  .desk-only { display: none !important; }
+  .block.status { align-items: center; gap: 10px; padding: 10px 0 2px; }
+  .chip { margin-top: 0; width: 18px; height: 18px; }
+  #status { font-size: 18px; }
+  #status-sub { min-height: 0; font-size: 13px; margin: 0; }
+  #status-sub:empty { display: none; }
+  .m-toolbar { display: flex; gap: 6px; flex: none; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--hair); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; padding: 0; }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn:disabled { opacity: 0.35; }
+  body.in-online-game #m-undo { display: none; }
+  .vs-line { background: var(--surface); border-radius: 12px; padding: 8px 12px; justify-content: space-between; font-size: 13px; }
+  #rated-note, #bot-note { font-size: 12px; }
+  #local-controls p:empty { display: none; }
+
+  .moves-box { background: var(--surface); border-radius: 14px; padding: 12px 14px; }
+  .moves-box summary { display: flex; align-items: center; justify-content: space-between; }
+  .moves-box summary h2 { margin: 0; }
+  .moves-box summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.2s; margin-right: 4px; }
+  .moves-box[open] summary { margin-bottom: 8px; }
+  .moves-box[open] summary::after { transform: rotate(-135deg); }
+  #moves { max-height: 180px; }
+
+  #online-controls .row .btn { flex: 1; }
+  .players { background: var(--surface); border-radius: 14px; padding: 12px; }
+
+  /* game settings: a bottom sheet */
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-radius: 22px 22px 0 0; padding: 8px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; gap: 14px; transform: translateY(105%); transition: transform 0.28s cubic-bezier(.2,.8,.2,1); box-shadow: 0 -10px 40px rgba(0,0,0,0.35); max-height: 85vh; overflow-y: auto; }
+  body.sheet-open .sheet { transform: none; }
+  .sheet-head { display: grid; grid-template-columns: 1fr auto; align-items: center; padding-top: 14px; position: relative; }
+  .sheet-head h3 { margin: 0; font-size: 18px; }
+  .grabber { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 38px; height: 5px; border-radius: 3px; background: var(--hair); }
+  .sheet-new { display: block; width: 100%; padding: 13px; font-size: 16px; border-radius: 14px; }
+  body.in-online-game .sheet-new { display: none; }
+  .sheet .field { grid-template-columns: 96px 1fr; }
+  .sheet select { padding: 10px; border-radius: 10px; }
+  .sheet-backdrop { display: block; position: fixed; inset: 0; z-index: 29; background: rgba(0,0,0,0.45); opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  body.sheet-open .sheet-backdrop { opacity: 1; pointer-events: auto; }
+
+  /* dialogs slide up from the bottom like native sheets */
+  .overlay { place-items: end stretch; padding: 0; }
+  .overlay .dialog { max-width: none; border-radius: 22px 22px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  #toasts { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+
+  /* install sheet points at Safari's toolbar */
+  .install-arrow { display: block; position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 12px solid var(--surface); }
+  .install-sheet .dialog { position: relative; margin-bottom: 18px; border-radius: 22px; margin-left: 10px; margin-right: 10px; }
 }
 
-/* game screen on phones: board first, controls next, banner last */
-@media (max-width: 860px) {
-  .game-grid { grid-template-areas: "stage" "side" "brand"; gap: 14px; }
-  .game-grid .brand { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-  .game-grid .brand .banner { max-width: 240px; }
-  .game-grid .brand .byline, .game-grid .brand .howto { margin-top: 0; }
-  .game-grid > aside { gap: 14px; }
-}
-@media (max-width: 640px) {
-  .view.game-grid { padding: 8px 8px 24px; }
-  .stage { padding: 4px; border-radius: 12px; }
-  #status { font-size: 18px; }
-}
-@media (hover: none) { .hover { display: none; } }
+/* installed app (opened from the Home Screen) */
+html.standalone, html.standalone body { overscroll-behavior-y: none; }
+html.standalone #install-card { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .sheet, .sheet-backdrop { transition: none; } }
 /* phone held sideways: let the bar scroll away so the board gets the height */
-@media (max-height: 500px) and (orientation: landscape) { .topbar { position: static; } }
+@media (max-height: 500px) and (orientation: landscape) {
+  .topbar { position: static; }
+  .view.game-grid { grid-template-columns: minmax(0, 1fr) 280px; grid-template-areas: "stage side"; padding-top: 8px; }
+  .game-grid .brand { display: none; }
+  .stage { padding: 4px; }
+}

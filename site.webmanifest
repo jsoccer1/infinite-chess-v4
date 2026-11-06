@@ -1,0 +1,16 @@
+{
+  "name": "Infinite Chess",
+  "short_name": "Infinite Chess",
+  "description": "Chess on a 72-cell figure-8 board, by Mark Colebank.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1c22",
+  "theme_color": "#1b1c22",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

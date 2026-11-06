@@ -55,10 +55,13 @@ const App = (() => {
 
   // ---------- views ----------
   const VIEWS = ['home', 'game', 'online', 'leaderboard', 'profile', 'howto', 'auth'];
+  const TITLES = { home: 'Infinite Chess', game: 'Play', online: 'Play Online', leaderboard: 'Leaderboard', profile: 'Profile', howto: 'How to Play', auth: 'Account' };
   function show(v) {
     view = v;
+    $('app-title').textContent = v === 'game' && og ? 'Online game' : TITLES[v] || 'Infinite Chess';
+    document.body.dataset.view = v;
     VIEWS.forEach((x) => ($('view-' + x).hidden = x !== v));
-    document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('current', b.dataset.nav === v));
+    document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('current', b.dataset.nav === v || (v === 'game' && b.dataset.nav === (og ? 'online' : 'bot'))));
     if (v === 'game') GameUI.activate();
     if (v === 'online') { renderOnlineView(); startLobbyList(); } else stopLobbyList();
     if (v === 'leaderboard') loadLeaderboard();
@@ -103,7 +106,11 @@ const App = (() => {
 
   // ---------- init ----------
   async function init() {
-    GameUI.setHooks({ toast, isSignedIn: () => !!(online && user), onlineAvailable: () => online, fetchPlaybook, onLocalGameOver });
+    GameUI.setHooks({ toast, isSignedIn: () => !!(online && user), onlineAvailable: () => online, fetchPlaybook, onLocalGameOver,
+      botRating: (lvl) => botRatings[lvl], myRating: () => (online && user && profile ? profile.rating : null) });
+    renderBotLabels();
+    initInstall();
+    $('pf-signout').addEventListener('click', (e) => withButton(e.currentTarget, async () => { closeGame(); await net(sb.auth.signOut()); }));
     document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => { setMenu(false); navigate(b.dataset.nav); }));
     $('menu-btn').addEventListener('click', (e) => { e.stopPropagation(); setMenu(!$('topbar').classList.contains('open')); });
     document.addEventListener('click', (e) => { if (!e.target.closest('#topnav')) setMenu(false); });
@@ -122,6 +129,7 @@ const App = (() => {
     if (!reachable) { setBanner('Offline'); sb = null; return; }
     online = true;
     setOnlineUI(true);
+    loadBotRatings();
 
     sb.auth.onAuthStateChange((event, session) => {
       // run outside the callback: calling Supabase inside it can deadlock
@@ -305,6 +313,56 @@ const App = (() => {
     } catch (e) { body.innerHTML = `<tr><td colspan="4" class="err">${esc(errMsg(e))}</td></tr>`; }
   }
 
+  // ---------- bot ratings ----------
+  // Fixed ratings for Easy/Medium/Hard; Dynamic moves with its results (see update-002-bot-ratings.sql).
+  const botRatings = { easy: 800, medium: 1100, hard: 1400, dynamic: 1400 };
+  const botStats = { dynamic: null, positions: null };
+  function renderBotLabels() {
+    const names = { easy: 'Easy', medium: 'Medium', hard: 'Hard', dynamic: 'Dynamic' };
+    document.querySelectorAll('#depth option').forEach((o) => (o.textContent = `${names[o.value]} (${botRatings[o.value]})`));
+    const d = botStats.dynamic;
+    let info = 'Dynamic plays like Hard but learns from every finished game on the server, so it gets stronger as more games are played.';
+    if (d) info += ` So far it has learned from ${d.games_learned} game${d.games_learned === 1 ? '' : 's'}` +
+      (botStats.positions != null ? ` covering ${botStats.positions.toLocaleString()} moves` : '') +
+      `. Record vs players: ${d.wins} W, ${d.losses} L, ${d.draws} D.`;
+    else if (!online) info += ' It needs the online features to learn, so offline it plays like Hard.';
+    $('bot-info').textContent = info;
+    $('bot-info').hidden = $('depth').value !== 'dynamic';
+    GameUI.refresh();
+  }
+  async function loadBotRatings() {
+    try {
+      const rows = await q(sb.from('bot_ratings').select('*'));
+      (rows || []).forEach((r) => { botRatings[r.level] = r.rating; if (r.level === 'dynamic') botStats.dynamic = r; });
+      const { count } = await net(sb.from('playbook').select('position_key', { count: 'exact', head: true }));
+      if (count != null) botStats.positions = count;
+    } catch (e) { /* bot_ratings missing until update-002 is run; keep the defaults */ }
+    renderBotLabels();
+  }
+
+  // ---------- install as an app ----------
+  let deferredPrompt = null;
+  const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = () => window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  function initInstall() {
+    if (isStandalone()) document.documentElement.classList.add('standalone');
+    if (isIOS()) document.documentElement.classList.add('ios');
+    const card = $('install-card');
+    const dismissed = () => store.get('ic_install_dismissed') === '1';
+    const update = () => { card.hidden = isStandalone() || dismissed() || !(isIOS() || deferredPrompt); };
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; update(); });
+    window.addEventListener('appinstalled', () => { deferredPrompt = null; update(); });
+    $('install-btn').addEventListener('click', async () => {
+      if (deferredPrompt) { deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch (e) { /* ignore */ } deferredPrompt = null; update(); return; }
+      $('install-sheet').hidden = false;
+    });
+    $('install-close').addEventListener('click', () => ($('install-sheet').hidden = true));
+    $('install-sheet').addEventListener('click', (e) => { if (e.target.id === 'install-sheet') $('install-sheet').hidden = true; });
+    $('install-dismiss').addEventListener('click', () => { store.set('ic_install_dismissed', '1'); update(); });
+    $('depth').addEventListener('change', () => renderBotLabels());
+    update();
+  }
+
   // ---------- bots: rated games and the learned playbook ----------
   const playbookCache = new Map();
   async function fetchPlaybook(key) {
@@ -326,8 +384,13 @@ const App = (() => {
       const res = asRow(await rpc('record_bot_game', { p_level: info.level, p_color: info.humanColor, p_moves: info.moves, p_result: info.result, p_reason: info.reason }));
       const change = res && res.rating_change;
       out.textContent = change ? `Rating ${signed(change)} (now ${res.new_rating}).` : `No rating change${res && res.new_rating != null ? ` (rating ${res.new_rating})` : ''}.`;
+      if (res && res.bot_level && res.bot_rating != null) {
+        botRatings[res.bot_level] = res.bot_rating;
+        if (res.bot_level === 'dynamic' && res.bot_rating_change) out.textContent += ` Dynamic bot ${signed(res.bot_rating_change)} (now ${res.bot_rating}).`;
+      }
       await loadProfile();
-      if (res && res.game_id) rpc('learn_from_game', { p_game: res.game_id, p_entries: info.entries }).catch(() => {});
+      renderBotLabels();
+      if (res && res.game_id) rpc('learn_from_game', { p_game: res.game_id, p_entries: info.entries }).then(loadBotRatings).catch(() => {});
     } catch (e) { out.textContent = errMsg(e); }
   }
   function playVsBot() {
@@ -469,6 +532,7 @@ const App = (() => {
     });
     renderPlayers();
     show('game');
+    $('app-title').textContent = 'Online game';
     og.channel = sb.channel('game-' + gid)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: 'id=eq.' + gid }, (payload) => onRow(payload.new))
       .subscribe();

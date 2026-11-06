@@ -23,10 +23,16 @@ Chess on a 72-cell figure-8 board, by Mark Colebank. The game runs as a static s
 Server rules worth knowing:
 
 - Online games use Elo with K = 32. A game ends when both players report the same result, by resignation, or by a claim after 10 minutes without a move. Different reports mark the game disputed and unrated.
-- Bot games: wins add 5 (Easy), 10 (Medium) or 15 (Hard). Losses and draws never lower the rating. Games under 20 moves (plies) are unrated. One bot game can be saved every 20 seconds.
+- Bots have ratings: Easy 800, Medium 1100, Hard 1400. Beating a bot awards Elo points against its rating, so stronger bots give more. Losses and draws against bots never lower a player's rating. Games under 20 moves (plies) are unrated. One bot game can be saved every 20 seconds.
+- The Dynamic bot searches like Hard but leans on the shared playbook, which grows with every finished game. It starts at 1400 and its rating moves up and down with its results against players (Elo, K = 24).
+- Existing projects: run `supabase/update-002-bot-ratings.sql` once to add bot ratings and the Dynamic bot. New projects get it from `setup.sql`.
 - The server checks turn order and move format, but only the browsers run the full rules, so a modified client could send a legal-looking but illegal move. The other player's browser then shows "Game out of sync".
 
 If `config.js` still has its placeholders, or Supabase cannot be reached, the site shows a small "Online features not configured" or "Offline" banner, hides the online menu items, and bot play keeps working.
+
+## Install as an app
+
+The site is a web app: on iPhone, open it in Safari, tap Share, then Add to Home Screen. The home screen shows an Install card with these steps. On Android and desktop Chrome the Install button opens the browser's own install prompt. `site.webmanifest` and the icon files make it open full screen with its own icon.
 
 ## Files
 
