@@ -1,4 +1,4 @@
 window.APP_CONFIG = {
-  SUPABASE_URL: "PASTE_PROJECT_URL_HERE",
-  SUPABASE_KEY: "PASTE_PUBLISHABLE_OR_ANON_KEY_HERE"
+  SUPABASE_URL: "https://qclymemywhinixjkviom.supabase.co",
+  SUPABASE_KEY: "sb_publishable_C22s3WbrmmhYCAPg0NYxiw_EtBsxqz6"
 };
