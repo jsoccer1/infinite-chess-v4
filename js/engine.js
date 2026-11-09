@@ -29,7 +29,19 @@ const BoardGraph = (() => {
     return { pos: { c: pos.t - 19, t: 11 - pos.c }, dir: { dc: dir.dt, dt: -dir.dc } };
   }
 
-  function step(pos, dir) {
+  // Tip links: the inner-ring cells either side of each hole's tip touch diagonally across it.
+  // R7 <-> R1 (beside R8) and Q12 <-> Q18 (beside Q11). A diagonal line entering the tip
+  // comes out on the other side heading away from the hole, e.g. N6, R7, R1, N2.
+  // Only diagonal sliders and the king use these; pawn and knight patterns do not.
+  function tipLink(pos, dir) {
+    if (pos.c === 3 && pos.t === 7 && dir.dc === 1 && dir.dt === 1) return { pos: { c: 3, t: 1 }, dir: { dc: -1, dt: 1 } };
+    if (pos.c === 3 && pos.t === 1 && dir.dc === 1 && dir.dt === -1) return { pos: { c: 3, t: 7 }, dir: { dc: -1, dt: -1 } };
+    if (pos.c === 0 && pos.t === 12 && dir.dc === -1 && dir.dt === -1) return { pos: { c: 0, t: 18 }, dir: { dc: 1, dt: -1 } };
+    if (pos.c === 0 && pos.t === 18 && dir.dc === -1 && dir.dt === 1) return { pos: { c: 0, t: 12 }, dir: { dc: 1, dt: 1 } };
+    return null;
+  }
+
+  function step(pos, dir, tips) {
     let c2 = pos.c + dir.dc;
     if (c2 >= 0 && c2 <= 3) return { pos: { c: c2, t: wrapT(pos.t + dir.dt) }, dir };
     if (inCrossing(pos.t)) {
@@ -37,7 +49,7 @@ const BoardGraph = (() => {
       c2 = o.pos.c + o.dir.dc;
       if (c2 >= 0 && c2 <= 3) return { pos: { c: c2, t: wrapT(o.pos.t + o.dir.dt) }, dir: o.dir };
     }
-    return null;
+    return tips ? tipLink(pos, dir) : null;
   }
 
   const ALL_CELLS = [];
@@ -46,7 +58,7 @@ const BoardGraph = (() => {
   function neighbors(name, dirs) {
     const s = new Set();
     for (const p of positionsOf(name)) for (const d of dirs) {
-      const r = step(p, d);
+      const r = step(p, d, true);
       if (r) { const n = cellAt(r.pos); if (n !== name) s.add(n); }
     }
     return s;
@@ -58,7 +70,7 @@ const BoardGraph = (() => {
     const out = [];
     let pos = startPos, d = dir;
     for (let i = 0; i < 100; i++) {
-      const r = step(pos, d);
+      const r = step(pos, d, true);
       if (!r) break;
       const n = cellAt(r.pos);
       if (n === name) break;
@@ -268,6 +280,13 @@ const Rules = (() => {
         const r = G.step(pos, { dc: F.dc + S.dc, dt: F.dt + S.dt });
         if (r) { const c = G.cellAt(r.pos); if (c !== name) caps.add(IDX[c]); }
       }
+    }
+    // Once a pawn is in the centre diamond it can never step back into the loop it came from
+    // (White came from cells 1-7, Black from 12-18), e.g. White R10 to Q1, Black Q9 to R18.
+    const n = parseInt(name.slice(1), 10);
+    if (n >= 8 && n <= 11) {
+      const home = (i) => (color === 'w' ? NUM[i] <= 7 : NUM[i] >= 12);
+      return { adv: adv.filter((a) => !home(a.one)), caps: [...caps].filter((i) => !home(i)) };
     }
     return { adv, caps: [...caps] };
   }

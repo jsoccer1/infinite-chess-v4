@@ -11,13 +11,13 @@ Q8  | Q7 Q9 B8 R18        | B7 B9 N18           | B6 B10 B18 N7 N9 N17
 Q9  | Q8 Q10 B9 N18       | B8 B10 B18 R18      | Q18 B7 B11 B17 N8 N10 R17
 Q10 | Q9 Q11 B10 B18      | Q18 B9 B11 N18      | Q17 B8 B12 N9 N11 N17 R18
 Q11 | Q10 Q12 Q18 B11     | B10 B12 B18         | B9 B13 B17 N10 N12 N18
-Q12 | Q11 Q13 B12         | B11 B13             | B10 B14 B18 N11 N13
+Q12 | Q11 Q13 B12         | B11 B13 Q18         | B10 B14 B18 N11 N13
 Q13 | Q12 Q14 B13         | B12 B14             | B11 B15 N12 N14
 Q14 | Q13 Q15 B14         | B13 B15             | B12 B16 N13 N15
 Q15 | Q14 Q16 B15         | B14 B16             | B13 B17 N14 N16
 Q16 | Q15 Q17 B16         | B15 B17             | B14 B18 N15 N17
 Q17 | Q16 Q18 B17         | B16 B18             | Q10 B15 N16 N18
-Q18 | Q11 Q17 B18         | Q10 B17             | Q9 B10 B12 B16 N17
+Q18 | Q11 Q17 B18         | Q10 B17 Q12         | Q9 B10 B12 B16 N17
 B1  | Q1 B2 N1 R10        | Q2 N2 R9 R11        | Q3 N3 N9 N11 R2 R8 R12
 B2  | Q2 B1 B3 N2         | Q1 Q3 N1 N3         | Q4 N4 R1 R3 R9 R11
 B3  | Q3 B2 B4 N3         | Q2 Q4 N2 N4         | Q1 Q5 N1 N5 R2 R4
@@ -54,13 +54,13 @@ N15 | B15 N14 N16 R15     | B14 B16 R14 R16     | Q14 Q16 B13 B17 R13 R17
 N16 | B16 N15 N17 R16     | B15 B17 R15 R17     | Q15 Q17 B14 B18 R14 R18
 N17 | B17 N16 N18 R17     | B16 B18 R16 R18     | Q8 Q10 Q16 Q18 B15 R15
 N18 | Q9 B18 N17 R18      | Q8 Q10 B17 R17      | Q7 Q11 Q17 B8 B10 B16 R16
-R1  | N1 R2 R8            | N2 R9               | B2 N3 N7 N9 R10
+R1  | N1 R2 R8            | N2 R9 R7            | B2 N3 N7 N9 R10
 R2  | N2 R1 R3            | N1 N3               | B1 B3 N4 R9
 R3  | N3 R2 R4            | N2 N4               | B2 B4 N1 N5
 R4  | N4 R3 R5            | N3 N5               | B3 B5 N2 N6
 R5  | N5 R4 R6            | N4 N6               | B4 B6 N3 N7
 R6  | N6 R5 R7            | N5 N7               | B5 B7 N4 N8
-R7  | N7 R6 R8            | N6 N8               | B6 B8 N1 N5 N9
+R7  | N7 R6 R8            | N6 N8 R1            | B6 B8 N1 N5 N9
 R8  | N8 R1 R7 R9         | N1 N7 N9            | B1 B7 B9 N2 N6 N10
 R9  | N1 N9 R8 R10        | B1 N8 N10 R1        | Q1 B2 B8 B10 N7 N11 R2
 R10 | B1 N10 R9 R11       | Q1 N1 N9 N11        | Q2 B9 B11 N2 N8 N12 R1
@@ -87,7 +87,7 @@ const APPENDIX_B = {
     { from: 'Q7', expect: [['B8', 'N9', 'R10', 'Q1'], ['B6', 'N5', 'R4']] },
     { from: 'B9', expect: [['N10', 'R11'], ['N8', 'R7'], ['Q10', 'Q18'], ['Q8']] },
     { from: 'N5', expect: [['R6'], ['R4'], ['B6', 'Q7'], ['B4', 'Q3']] },
-    { from: 'Q4', expect: [['B5', 'N6', 'R7'], ['B3', 'N2', 'R1']] },
+    { from: 'Q4', expect: [['B5', 'N6', 'R7', 'R1', 'N2', 'B3'], ['B3', 'N2', 'R1', 'R7', 'N6', 'B5']] },   // through the R7/R1 tip link
     { from: 'R8', expect: [['N1', 'B2', 'Q3'], ['N9', 'B10', 'Q11'], ['N7', 'B6', 'Q5']] },
   ],
 };
@@ -279,6 +279,14 @@ const Tests = (() => {
     { const s = R.emptyGame(); s.board[R.IDX.B14] = { t: 'P', c: 'w', moved: true }; s.board[R.IDX.Q4] = { t: 'K', c: 'w', moved: true }; s.board[R.IDX.R13] = { t: 'K', c: 'b', moved: true };
       const ms = R.legalMoves(s, 'w').filter((m) => R.NAMES[m.from] === 'B14');
       add(5, 'White pawn reaching a 15 cell promotes (Q, R, B or N)', ms.length === 4 && ms.every((m) => R.NAMES[m.to] === 'B15' && m.promo)); }
+    // tip links and the no-retreat pawn rule
+    add(5, 'Bishops, queens and kings cross the hole tips: R7 and R1, Q12 and Q18 are diagonal neighbors', G.diagonalNeighbors('R7').has('R1') && G.diagonalNeighbors('Q12').has('Q18'));
+    add(5, 'Knights do not use the tip links', !G.leaperTargets('N6').has('N2') && sortJoin(G.leaperTargets('R7')) === 'B6 B8 N1 N5 N9');
+    { const s = R.emptyGame(); s.board[R.IDX.R7] = { t: 'P', c: 'w', moved: true };
+      add(5, 'Pawns do not use the tip links (White pawn on R7 cannot capture on R1)', !R.PAWN.w[R.IDX.R7].caps.includes(R.IDX.R1)); }
+    { const cases = [['w', 'R10', 'Q1'], ['w', 'B8', 'Q7'], ['b', 'Q9', 'R18'], ['b', 'N11', 'R12']];
+      const bad = cases.filter(([c, from, to]) => R.PAWN[c][R.IDX[from]].caps.includes(R.IDX[to]) || R.PAWN[c][R.IDX[from]].adv.some((a) => a.one === R.IDX[to]));
+      add(5, 'Pawns in the centre diamond never move back into their own loop (R10-Q1, B8-Q7, Q9-R18, N11-R12)', bad.length === 0, bad.map((b) => b.join(' ')).join(', ')); }
     return res;
   }
 

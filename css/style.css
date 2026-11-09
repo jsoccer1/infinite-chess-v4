@@ -253,6 +253,25 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .step-ico { flex: none; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--bg); color: var(--accent); }
 .step-ico svg { width: 22px; height: 22px; }
 
+/* board and piece customizations */
+.appearance summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+.appearance summary::-webkit-details-marker { display: none; }
+.appearance summary h2 { margin: 0; }
+.appearance summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform 0.2s; margin-right: 4px; }
+.appearance[open] summary::after { transform: rotate(-135deg); }
+.mini-label { display: flex; justify-content: space-between; margin: 14px 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--hair); }
+.seg button { border: 0; background: none; padding: 8px; border-radius: 9px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
+.swatch { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 2px solid transparent; background: var(--bg); cursor: pointer; }
+.swatch[aria-pressed="true"] { border-color: var(--accent); }
+.swatch > span { width: 40px; height: 40px; border-radius: 10px; display: block; box-shadow: inset 0 0 0 1px rgba(128,128,128,0.35); }
+.swatch > span.pc { display: flex; align-items: center; justify-content: center; gap: 0; background: #8c8c8c; font-family: "Segoe UI Symbol", "Noto Sans Symbols 2", "DejaVu Sans", "Apple Symbols", serif; font-size: 21px; line-height: 1; }
+.swatch > span.pc i { font-style: normal; paint-order: stroke fill; }
+.swatch small { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+
 /* ================= phone: app shell ================= */
 @media (max-width: 640px) {
   html { -webkit-text-size-adjust: 100%; }

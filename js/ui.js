@@ -21,22 +21,53 @@ const GameUI = (() => {
   let session = { kind: 'local', opponent: 'human', tainted: false, reported: false, token: {} };
   let hooks = { fetchPlaybook: null, onLocalGameOver: null, isSignedIn: () => false, toast: (m) => alert(m), onlineAvailable: () => false, botRating: () => null, myRating: () => null };
 
+  // ---------- player customizations (saved on this device) ----------
+  const THEMES = {
+    classic:    { name: 'Classic',    light: '#ebebe3', dark: '#1b1b1b', label: '#e0322f' },
+    tournament: { name: 'Tournament', light: '#eeeed2', dark: '#769656', label: '#b3261e' },
+    walnut:     { name: 'Walnut',     light: '#ecd3a5', dark: '#8b5a2b', label: '#7a1f12' },
+    ocean:      { name: 'Ocean',      light: '#dce8f4', dark: '#3a6ea5', label: '#c0392b' },
+    midnight:   { name: 'Midnight',   light: '#8f9aa8', dark: '#252c38', label: '#ffd166' },
+    rose:       { name: 'Rose',       light: '#f6e4e1', dark: '#b65c67', label: '#5b1a24' },
+  };
+  const PIECE_SETS = {
+    classic: { name: 'Classic',         w: { fill: '#fbf7ee', stroke: '#1a1d1b' }, b: { fill: '#1f2421', stroke: '#efe8d6' } },
+    metal:   { name: 'Gold and Silver', w: { fill: '#e3e7ec', stroke: '#3d4652' }, b: { fill: '#d4a52a', stroke: '#4a3100' } },
+    royal:   { name: 'Ruby and Sapphire', w: { fill: '#e5484d', stroke: '#ffffff' }, b: { fill: '#3e63dd', stroke: '#ffffff' } },
+    ivory:   { name: 'Ivory and Ebony', w: { fill: '#fff4dc', stroke: '#6b4e1e' }, b: { fill: '#2b1d14', stroke: '#e9c88a' } },
+  };
+  const PREF_KEY = 'ic_prefs';
+  const prefs = Object.assign({ orient: 'vertical', theme: 'classic', pieces: 'classic', size: 100, names: false },
+    (() => { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch (e) { return {}; } })());
+  if (!THEMES[prefs.theme]) prefs.theme = 'classic';
+  if (!PIECE_SETS[prefs.pieces]) prefs.pieces = 'classic';
+  prefs.size = Math.min(140, Math.max(60, +prefs.size || 100));
+  function savePrefs() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* private mode */ } }
+  st.showNames = !!prefs.names;
+
   // ---------- coordinate transforms ----------
   let view = { ox: 0, oy: 0, sc: 1, dpr: 1 };
   const MARGIN = 0.25;
-  // On phones held upright the figure-8 is turned 90 degrees so it can use the full screen width.
-  const portraitPhone = () => window.innerWidth <= 640 && window.innerHeight > window.innerWidth;
+  // Vertical (default) turns the figure-8 a quarter turn so White's loop is at the bottom.
   function resize() {
     const wrap = canvas.parentElement;
     canvas.style.width = '0px'; canvas.style.height = '0px';   // measure the container, not the old canvas
     const cssW = wrap.clientWidth;
     if (!cssW) return;                                         // view hidden
-    const rot = portraitPhone();
+    const rot = prefs.orient === 'vertical';
     const bw = (rot ? Ge.BOARD_H : Ge.BOARD_W) + 2 * MARGIN, bh = (rot ? Ge.BOARD_W : Ge.BOARD_H) + 2 * MARGIN;
     const aspect = bh / bw;
+    // room left on screen below the board's top edge (keeps the status row above the tab bar)
+    const top = wrap.getBoundingClientRect().top + window.scrollY;
+    const tabbar = document.getElementById('tabbar');
+    const tabH = tabbar && getComputedStyle(tabbar).display !== 'none' ? tabbar.offsetHeight : 0;
+    const phone = window.innerWidth <= 640;
+    const below = phone ? tabH + 72 : (window.innerWidth > 860 || window.innerHeight < 560 ? 24 : 0);
+    const maxH = Math.max(220, window.innerHeight - top - below);
     let w = cssW, h = w * aspect;
-    const maxH = rot ? Math.max(300, window.innerHeight - 230) : Math.max(220, window.innerHeight - (window.innerHeight < 560 ? 40 : 120));
-    if (h > maxH && (rot || window.innerWidth > 860 || window.innerHeight < 560)) { h = maxH; w = h / aspect; }
+    if (below && h > maxH) { h = maxH; w = h / aspect; }
+    const k = prefs.size / 100;                               // player's board size setting
+    w = Math.min(cssW, w * k); h = w * aspect;
     const dpr = window.devicePixelRatio || 1;
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
@@ -76,8 +107,8 @@ const GameUI = (() => {
 
   function draw() {
     const C = {
-      light: cssVar('--cell-light'), dark: cssVar('--cell-dark'), bg: cssVar('--surface'), rim: cssVar('--rim'),
-      accent: cssVar('--accent'), check: cssVar('--danger'), last: cssVar('--last'), label: cssVar('--label'),
+      light: THEMES[prefs.theme].light, dark: THEMES[prefs.theme].dark, bg: cssVar('--surface'), rim: cssVar('--rim'),
+      accent: cssVar('--accent'), check: cssVar('--danger'), last: cssVar('--last'), label: THEMES[prefs.theme].label,
     };
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -127,17 +158,33 @@ const GameUI = (() => {
     }
   }
   function drawPiece(name, p) { drawPieceAt(LABEL[name], p); }
+  // Chess glyphs carry uneven side bearings in most fonts, so centre the visible ink, not the text box.
+  const inkCache = new Map();
+  function inkOffset(g, px) {
+    const key = g + '|' + Math.round(px * 10);
+    let o = inkCache.get(key);
+    if (!o) {
+      const m = ctx.measureText(g);
+      o = (m.actualBoundingBoxAscent || m.actualBoundingBoxDescent)
+        ? { dx: (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2, dy: (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2 }
+        : { dx: 0, dy: px * 0.35 };
+      inkCache.set(key, o);
+    }
+    return o;
+  }
   function drawPieceAt(pt, p) {
     const s = toScreen(pt), px = PIECE_UNITS * view.sc;   // one size for every piece on every cell
+    const set = PIECE_SETS[prefs.pieces][p.c];
     ctx.font = `${px}px ${PIECE_FONT}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const g = GLYPH[p.t] + VS, y = s.y + px * 0.04;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    const g = GLYPH[p.t] + VS, o = inkOffset(g, px);
+    const x = s.x + o.dx, y = s.y + o.dy;
     ctx.lineJoin = 'round';
     ctx.lineWidth = Math.max(1.5, px * 0.075);
-    ctx.strokeStyle = p.c === 'w' ? '#1a1d1b' : '#efe8d6';
-    ctx.strokeText(g, s.x, y);
-    ctx.fillStyle = p.c === 'w' ? '#fbf7ee' : '#1f2421';
-    ctx.fillText(g, s.x, y);
+    ctx.strokeStyle = set.stroke;
+    ctx.strokeText(g, x, y);
+    ctx.fillStyle = set.fill;
+    ctx.fillText(g, x, y);
   }
 
   // ---------- game logic ----------
@@ -467,8 +514,27 @@ const GameUI = (() => {
   $('sheet-done').addEventListener('click', () => setSheet(false));
   $('sheet-backdrop').addEventListener('click', () => setSheet(false));
   $('sheet-new').addEventListener('click', () => { setSheet(false); newLocal(); });
-  if (matchMedia('(max-width: 640px)').matches) $('moves-box').open = false;
-  $('names').addEventListener('change', (e) => { st.showNames = e.target.checked; draw(); });
+  if (matchMedia('(max-width: 640px)').matches) { $('moves-box').open = false; $('appearance').open = true; }
+  $('names').checked = st.showNames;
+  $('names').addEventListener('change', (e) => { st.showNames = prefs.names = e.target.checked; savePrefs(); draw(); });
+
+  // ---------- appearance controls ----------
+  function renderAppearance() {
+    document.querySelectorAll('[data-orient]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.orient === prefs.orient)));
+    $('theme-swatches').innerHTML = Object.entries(THEMES).map(([k, t]) =>
+      `<button type="button" class="swatch" data-theme-key="${k}" aria-pressed="${k === prefs.theme}" aria-label="${t.name} board"><span style="background:linear-gradient(135deg, ${t.light} 0 50%, ${t.dark} 50% 100%)"></span><small>${t.name}</small></button>`).join('');
+    $('piece-swatches').innerHTML = Object.entries(PIECE_SETS).map(([k, t]) =>
+      `<button type="button" class="swatch" data-piece-key="${k}" aria-pressed="${k === prefs.pieces}" aria-label="${t.name} pieces"><span class="pc"><i style="color:${t.w.fill};-webkit-text-stroke:1px ${t.w.stroke}">${GLYPH.K}${VS}</i><i style="color:${t.b.fill};-webkit-text-stroke:1px ${t.b.stroke}">${GLYPH.K}${VS}</i></span><small>${t.name}</small></button>`).join('');
+    $('board-size').value = prefs.size;
+    $('board-size-val').textContent = prefs.size + '%';
+  }
+  document.querySelectorAll('[data-orient]').forEach((b) => b.addEventListener('click', () => { prefs.orient = b.dataset.orient; savePrefs(); renderAppearance(); resize(); }));
+  $('theme-swatches').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-key]'); if (!b) return; prefs.theme = b.dataset.themeKey; savePrefs(); renderAppearance(); draw(); });
+  $('piece-swatches').addEventListener('click', (e) => { const b = e.target.closest('[data-piece-key]'); if (!b) return; prefs.pieces = b.dataset.pieceKey; savePrefs(); renderAppearance(); draw(); });
+  $('board-size').addEventListener('input', (e) => { prefs.size = +e.target.value; $('board-size-val').textContent = prefs.size + '%'; resize(); });
+  $('board-size').addEventListener('change', savePrefs);
+  $('appearance-reset').addEventListener('click', () => { Object.assign(prefs, { orient: 'vertical', theme: 'classic', pieces: 'classic', size: 100 }); savePrefs(); renderAppearance(); resize(); });
+  renderAppearance();
   $('opponent').addEventListener('change', (e) => {
     taint();
     session.opponent = e.target.value === 'computer' ? 'computer' : 'human';

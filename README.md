@@ -8,6 +8,9 @@ Chess on a 72-cell figure-8 board, by Mark Colebank. The game runs as a static s
 - The board is two loops joined by a 4x4 crossing. Each of the four lanes (Q, B, N, R) loops forever, so rooks, bishops and queens keep sliding around until something blocks them.
 - White starts in the left loop, Black in the right loop. White moves first.
 - Pawns move toward the other loop. White promotes on a cell numbered 15, Black on a cell numbered 4.
+- Once a pawn enters the 16-cell center diamond it can never move back into the loop it came from (for example White R10 to Q1 or Black Q9 to R18).
+- Bishops, queens and kings can cross diagonally over the tip of each center hole: R7 to R1 and Q12 to Q18. Pawns and knights cannot.
+- The board shows vertically by default (White at the bottom). Game settings let each player switch to horizontal, change board colors and piece colors, and resize the board. These choices are saved on the device.
 - Checkmate wins. Stalemate and threefold repetition are draws.
 - Video walkthrough: https://youtu.be/NuzgnSQVKGU?si=BK_mP7PERFE9E7Qv
 - Add `#test` to the URL to run the built-in rules test suite in the browser.
@@ -72,7 +75,13 @@ These are additions only; existing behavior is unchanged.
 - `Rules.moveToString(move)`: deterministic move string, `FROM-TO`, plus `=Q`, `=R`, `=B` or `=N` for promotions. Castling is the king's move, for example `Q4-N4`.
 - `Rules.moveFromString(state, str)`: returns the legal move for a string, or `null` if it is not legal in that position.
 - `positionKey(state)` (also `Rules.playbookKey`): `<w|b>|<white pieces>|<black pieces>|<castling rights>`, pieces like `K@Q4` sorted alphabetically, rights `W`, `B`, `WB` or `-`. The older `Rules.positionKey` (used for threefold repetition) is unchanged.
-- `AI.chooseMove` takes an optional list of move strings to search first. It only changes search order.
+- `AI.chooseMove` takes an optional list of move strings to search first, and an optional list to avoid at the root.
+
+### Rule changes after the original spec
+
+- `BoardGraph.step(pos, dir, tips)`: with `tips` on, a diagonal step off R7 toward the hole lands on R1 (and back), and Q12 links to Q18 the same way. Diagonal lines, diagonal neighbors and the king use it; knight and pawn patterns do not.
+- `pawnPattern` drops any advance or capture from a center cell (8 to 11) into the pawn's own home loop (White 1 to 7, Black 12 to 18).
+- The `#test` suite was updated to match: Appendix A rows R1, R7, Q12, Q18 and the Q4 diagonal lines, plus new checks for both rules.
 
 ### Online flow
 
