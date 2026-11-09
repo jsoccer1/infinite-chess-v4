@@ -272,6 +272,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .swatch small { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.2; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 
+/* puzzles */
+.pz-card { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface)); border: 1px solid var(--hair); border-radius: 14px; padding: 12px 14px; }
+.pz-goal { margin: 0; font-size: 17px; font-weight: 700; }
+.pz-meta { margin: 4px 0 0; display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); }
+#pz-result { margin: 0; font-weight: 600; }
+#pz-result:empty, #pz-note:empty { display: none; }
+#pz-result.ok, #status[data-tone="ok"] { color: var(--pass); }
+#pz-result.err, #status[data-tone="err"] { color: var(--fail); }
+.pz-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pz-stats div { background: var(--bg); border-radius: 12px; padding: 8px; text-align: center; }
+.pz-stats b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.pz-stats span { font-size: 11px; color: var(--muted); }
+.pz-actions .btn { flex: 1 1 auto; }
+#m-next { display: none !important; }
+body.in-puzzle .m-toolbar #m-next { display: grid !important; }
+body.in-puzzle #m-undo, body.in-puzzle .sheet-new, body.in-puzzle #moves-box { display: none !important; }
+
 /* ================= phone: app shell ================= */
 @media (max-width: 640px) {
   html { -webkit-text-size-adjust: 100%; }

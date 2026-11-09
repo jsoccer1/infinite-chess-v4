@@ -4,26 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Infinite Chess</title>
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=5">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=5">
-<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png?v=5">
-<link rel="icon" type="image/svg+xml" href="favicon.svg?v=5">
-<link rel="shortcut icon" href="favicon.ico?v=5">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=5">
-<link rel="manifest" href="site.webmanifest?v=5">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png?v=6">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png?v=6">
+<link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png?v=6">
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=6">
+<link rel="shortcut icon" href="favicon.ico?v=6">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=6">
+<link rel="manifest" href="site.webmanifest?v=6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Infinite Chess">
 <meta name="application-name" content="Infinite Chess">
 <meta name="format-detection" content="telephone=no">
+<meta name="app-version" content="6">
 <meta name="theme-color" content="#e6e7ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1b1c22" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=5">
-<script src="config.js?v=5"></script>
+<link rel="stylesheet" href="css/style.css?v=6">
+<script src="config.js?v=6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -37,9 +38,10 @@
 
 <div id="net-banner" class="net-banner" role="status" hidden></div>
 <header class="topbar" id="topbar">
-  <button type="button" class="brand-btn" data-nav="home"><img src="favicon.svg?v=5" alt="" width="26" height="26"><span id="app-title">Infinite Chess</span></button>
+  <button type="button" class="brand-btn" data-nav="home"><img src="favicon.svg?v=6" alt="" width="26" height="26"><span id="app-title">Infinite Chess</span></button>
   <nav class="topnav" id="topnav" aria-label="Main">
     <button type="button" data-nav="bot">Play vs Bot</button>
+    <button type="button" data-nav="puzzles">Puzzles</button>
     <button type="button" data-nav="online" data-online hidden>Play Online</button>
     <button type="button" data-nav="leaderboard" data-online hidden>Leaderboard</button>
     <button type="button" data-nav="profile" class="only-mobile" data-online hidden>Profile</button>
@@ -57,7 +59,7 @@
     <h1><img class="banner" src="assets/banner.jpg" alt=""><span class="sr">Infinite Chess</span></h1>
     <p class="byline">by Mark Colebank</p>
     <div class="install-card" id="install-card" hidden>
-      <img src="apple-touch-icon.png?v=5" alt="" width="52" height="52">
+      <img src="apple-touch-icon.png?v=6" alt="" width="52" height="52">
       <div><b>Get the Infinite Chess app</b><span>Add it to your Home Screen to play full screen, like any other app.</span></div>
       <button type="button" class="btn primary" id="install-btn">Install</button>
       <button type="button" class="install-x" id="install-dismiss" aria-label="Dismiss">&times;</button>
@@ -65,6 +67,7 @@
     <div class="menu">
       <button type="button" class="primary" id="home-resume" hidden><b>Resume online game</b><span>Reconnect to your game in progress</span></button>
       <button type="button" class="primary" data-nav="bot"><b>Play vs Bot</b><span>Easy, Medium or Hard. Also two players on one device.</span></button>
+      <button type="button" data-nav="puzzles"><b>Puzzles</b><span>Checkmate in 1 or 2, or win material. Earn a puzzle rating.</span></button>
       <button type="button" data-nav="online" data-online hidden><b>Play Online</b><span>Host or join a password-protected lobby</span></button>
       <button type="button" data-nav="leaderboard" data-online hidden><b>Leaderboard</b><span>Top 50 players by rating</span></button>
       <button type="button" data-nav="profile" data-online hidden><b>Profile</b><span>Avatar, username, stats and recent games</span></button>
@@ -92,6 +95,7 @@
         <div class="m-toolbar" role="toolbar" aria-label="Game actions">
           <button type="button" class="icon-btn" id="m-undo" aria-label="Undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
           <button type="button" class="icon-btn" id="m-flip" aria-label="Flip board"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button>
+          <button type="button" class="icon-btn pz-only" id="m-next" aria-label="Next puzzle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           <button type="button" class="icon-btn" id="m-settings" aria-label="Game settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
         </div>
       </div>
@@ -106,6 +110,28 @@
           <button type="button" class="btn desk-only" id="flip-online">Flip board</button>
         </div>
         <div><button type="button" class="btn small" id="leave-online">Leave (game continues)</button></div>
+      </div>
+
+      <div id="puzzle-controls" class="panel" hidden>
+        <div class="pz-card">
+          <p class="pz-goal" id="pz-goal">Find the best move</p>
+          <p class="pz-meta"><span id="pz-id"></span><span id="pz-rating"></span></p>
+        </div>
+        <p id="pz-result" aria-live="polite"></p>
+        <div class="row pz-actions">
+          <button type="button" class="btn" id="pz-hint">Hint</button>
+          <button type="button" class="btn" id="pz-retry" hidden>Retry</button>
+          <button type="button" class="btn" id="pz-solution" hidden>Show solution</button>
+          <button type="button" class="btn primary" id="pz-next">Next puzzle</button>
+        </div>
+        <div class="pz-stats">
+          <div><b id="pz-my">1000</b><span>Puzzle rating</span></div>
+          <div><b id="pz-streak">0</b><span>Streak</span></div>
+          <div><b id="pz-solved">0</b><span>Solved</span></div>
+        </div>
+        <div class="field"><label for="pz-diff">Difficulty</label>
+          <select id="pz-diff"><option value="-600">Easiest</option><option value="-300">Easier</option><option value="0" selected>Normal</option><option value="300">Harder</option><option value="600">Hardest</option></select></div>
+        <p class="hint" id="pz-note"></p>
       </div>
 
       <div id="local-controls" class="panel">
@@ -266,6 +292,19 @@
         <li>Turn on &ldquo;Show cell names&rdquo; in a game to see every cell&rsquo;s name.</li>
       </ul>
     </div>
+    <div class="card">
+      <h3>The bots and their ratings</h3>
+      <p>Every player starts at 1200. The bots have fixed ratings: <b>Easy 800</b> (looks one move ahead), <b>Medium 1100</b> (two moves) and <b>Hard 1400</b> (three moves).</p>
+      <p>Beat a bot in a rated game and you gain points based on the gap between your rating and the bot&rsquo;s: a stronger bot gives more. Losses and draws against bots never lower your rating, and games shorter than 20 moves are unrated.</p>
+      <h3>The Dynamic bot</h3>
+      <p>Dynamic searches as deep as Hard, then adds a memory. Every finished game on the site, against bots or online between players, is added to a shared playbook: for each position, which moves were played and how those games ended. Dynamic plays the moves with a proven winning record and avoids the moves that keep losing. The more games people play, the more positions it knows.</p>
+      <p>Unlike the other bots, Dynamic&rsquo;s rating moves. It started at 1400. After every rated game against it, its rating changes like a player&rsquo;s (Elo, 24 points at stake): it goes up when it beats someone, more for beating a higher-rated player, and down when it loses. As it learns and wins more, its rating climbs. Choose Dynamic in game settings to see its current rating, how many games it has learned from, and its record.</p>
+    </div>
+    <div class="card">
+      <h3>Puzzles</h3>
+      <p>Each puzzle is a position from a real Infinite Chess game with one clear goal: <b>checkmate in 1</b>, <b>checkmate in 2</b>, or <b>win material</b>. Make the moves for the side shown; the opponent replies with its best defence.</p>
+      <p>You have a separate puzzle rating that starts at 1000. Solving a puzzle raises it and missing one lowers it, more or less depending on the puzzle&rsquo;s own rating. Puzzles are picked near your rating, so they get harder as you improve, and each puzzle&rsquo;s rating also adjusts as players solve or miss it. Choose Easiest to Hardest to shift the range. Using a hint, or trying a puzzle again, does not raise your rating.</p>
+    </div>
   </div>
 </section>
 
@@ -313,14 +352,15 @@
 <nav class="tabbar" id="tabbar" aria-label="App">
   <button type="button" data-nav="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></button>
   <button type="button" data-nav="bot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21h6M8 18h8l-1-6h-6z"/><path d="M12 3v3M10.5 4.5h3"/><circle cx="12" cy="9" r="3"/></svg><span>Play</span></button>
+  <button type="button" data-nav="puzzles"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v3a2 2 0 1 0 4 0h3v5h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H3v-6h3a2 2 0 1 0 0-4H3V6h7z"/></svg><span>Puzzles</span></button>
   <button type="button" data-nav="online" data-online hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span>Online</span></button>
   <button type="button" data-nav="leaderboard" data-online hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg><span>Ranks</span></button>
-  <button type="button" data-nav="howto"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h0"/></svg><span>Rules</span></button>
+  <button type="button" data-nav="howto" data-offline><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h0"/></svg><span>Rules</span></button>
 </nav>
 
 <div class="overlay install-sheet" id="install-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="install-title">
   <div class="dialog">
-    <div class="install-head"><img src="apple-touch-icon.png?v=5" alt="" width="60" height="60"><div><h2 id="install-title">Install Infinite Chess</h2><p class="hint">Full screen, its own icon, no browser bars.</p></div></div>
+    <div class="install-head"><img src="apple-touch-icon.png?v=6" alt="" width="60" height="60"><div><h2 id="install-title">Install Infinite Chess</h2><p class="hint">Full screen, its own icon, no browser bars.</p></div></div>
     <ol class="install-steps">
       <li><span class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11H5v10h14V11h-1"/></svg></span><div><b>Tap the Share button</b><span>In Safari it is at the bottom of the screen. On newer iPhones, tap <b>&hellip;</b> first, then <b>Share</b>.</span></div></li>
       <li><span class="step-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span><div><b>Choose &ldquo;Add to Home Screen&rdquo;</b><span>Scroll down the list if you don&rsquo;t see it.</span></div></li>
@@ -360,10 +400,12 @@
 
 <div id="toasts" aria-live="polite"></div>
 
-<script src="js/engine.js?v=5"></script>
-<script src="js/tests.js?v=5"></script>
-<script src="js/avatars.js?v=5"></script>
-<script src="js/ui.js?v=5"></script>
-<script src="js/online.js?v=5"></script>
+<script src="js/engine.js?v=6"></script>
+<script src="js/puzzles.js?v=6"></script>
+<script src="js/puzzle-bank.js?v=6"></script>
+<script src="js/tests.js?v=6"></script>
+<script src="js/avatars.js?v=6"></script>
+<script src="js/ui.js?v=6"></script>
+<script src="js/online.js?v=6"></script>
 </body>
 </html>

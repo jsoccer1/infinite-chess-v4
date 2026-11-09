@@ -55,13 +55,13 @@ const App = (() => {
 
   // ---------- views ----------
   const VIEWS = ['home', 'game', 'online', 'leaderboard', 'profile', 'howto', 'auth'];
-  const TITLES = { home: 'Infinite Chess', game: 'Play', online: 'Play Online', leaderboard: 'Leaderboard', profile: 'Profile', howto: 'How to Play', auth: 'Account' };
+  const TITLES = { home: 'Infinite Chess', game: 'Play', puzzles: 'Puzzles', online: 'Play Online', leaderboard: 'Leaderboard', profile: 'Profile', howto: 'How to Play', auth: 'Account' };
   function show(v) {
     view = v;
-    $('app-title').textContent = v === 'game' && og ? 'Online game' : TITLES[v] || 'Infinite Chess';
+    $('app-title').textContent = v === 'game' && og ? 'Online game' : v === 'game' && GameUI.kind() === 'puzzle' ? 'Puzzles' : TITLES[v] || 'Infinite Chess';
     document.body.dataset.view = v;
     VIEWS.forEach((x) => ($('view-' + x).hidden = x !== v));
-    document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('current', b.dataset.nav === v || (v === 'game' && b.dataset.nav === (og ? 'online' : 'bot'))));
+    document.querySelectorAll('[data-nav]').forEach((b) => b.classList.toggle('current', b.dataset.nav === v || (v === 'game' && b.dataset.nav === (og ? 'online' : GameUI.kind() === 'puzzle' ? 'puzzles' : 'bot'))));
     if (v === 'game') GameUI.activate();
     if (v === 'online') { renderOnlineView(); startLobbyList(); } else stopLobbyList();
     if (v === 'leaderboard') loadLeaderboard();
@@ -72,6 +72,7 @@ const App = (() => {
   function needAuth(next) { afterAuth = next; showAuth('signin'); }
   function navigate(target) {
     if (target === 'bot') { playVsBot(); return; }
+    if (target === 'puzzles') { openPuzzles(); return; }
     if ((target === 'online' || target === 'profile') && !user) { needAuth(target); return; }
     show(target);
   }
@@ -80,6 +81,7 @@ const App = (() => {
   function setBanner(text) { const b = $('net-banner'); b.textContent = text || ''; b.hidden = !text; }
   function setOnlineUI(on) {
     document.querySelectorAll('[data-online]').forEach((el) => (el.hidden = !on));
+    document.querySelectorAll('[data-offline]').forEach((el) => (el.hidden = on));
     renderHeader(); renderHome(); GameUI.refresh();
   }
   function setMenu(open) {
@@ -110,6 +112,8 @@ const App = (() => {
       botRating: (lvl) => botRatings[lvl], myRating: () => (online && user && profile ? profile.rating : null) });
     renderBotLabels();
     initInstall();
+    initPuzzles();
+    checkVersion();
     $('pf-signout').addEventListener('click', (e) => withButton(e.currentTarget, async () => { closeGame(); await net(sb.auth.signOut()); }));
     document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => { setMenu(false); navigate(b.dataset.nav); }));
     $('menu-btn').addEventListener('click', (e) => { e.stopPropagation(); setMenu(!$('topbar').classList.contains('open')); });
@@ -363,6 +367,187 @@ const App = (() => {
     update();
   }
 
+  // ---------- keep installed copies up to date ----------
+  // GitHub Pages lets browsers cache index.html for a few minutes, and Home Screen apps hold on
+  // longer. version.json is fetched fresh; if it is newer than this page, reload once.
+  async function checkVersion() {
+    const mine = (document.querySelector('meta[name="app-version"]') || {}).content;
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      const { version } = await r.json();
+      if (version && mine && version !== mine && sessionStorage.getItem('ic_reloaded') !== version) {
+        sessionStorage.setItem('ic_reloaded', version);
+        const u = new URL(location.href); u.searchParams.set('v', version);
+        location.replace(u.toString());
+      }
+    } catch (e) { /* offline: keep the copy we have */ }
+  }
+
+  // ---------- puzzles ----------
+  const PZ_LOCAL = 'ic_puzzles';
+  const pz = { bank: [], byId: {}, ratings: {}, cur: null, step: 0, moves: [], state: 'idle', hinted: false, retry: false, attemptedIds: new Set(), local: null };
+  const GOAL = { mate1: 'checkmate in 1', mate2: 'checkmate in 2', material: 'win material' };
+  const S = (m) => Rules.moveToString(m);
+  function loadLocalPz() {
+    let d = {};
+    try { d = JSON.parse(localStorage.getItem(PZ_LOCAL) || '{}'); } catch (e) { d = {}; }
+    pz.local = Object.assign({ rating: 1000, solved: 0, attempted: 0, streak: 0, best: 0, seen: [], diff: 0 }, d);
+  }
+  function saveLocalPz() { store.set(PZ_LOCAL, JSON.stringify(pz.local)); }
+  const serverPz = () => online && user && profile && profile.puzzle_rating != null;
+  const myPzRating = () => (serverPz() ? profile.puzzle_rating : pz.local.rating);
+  const pzRating = (p) => pz.ratings[p.id] != null ? pz.ratings[p.id] : p.rating;
+
+  function initPuzzles() {
+    loadLocalPz();
+    pz.bank = Array.isArray(window.PUZZLE_BANK) ? window.PUZZLE_BANK : [];
+    pz.bank.forEach((p) => (pz.byId[p.id] = p));
+    $('pz-diff').value = String(pz.local.diff || 0);
+    $('pz-diff').addEventListener('change', (e) => { pz.local.diff = +e.target.value; saveLocalPz(); });
+    $('pz-next').addEventListener('click', () => {
+      if (pz.state === 'progress' && !pz.retry) finishPuzzle(false, 'Skipped.');
+      nextPuzzle();
+    });
+    $('pz-retry').addEventListener('click', () => { pz.retry = true; startCurrent(); });
+    $('pz-hint').addEventListener('click', () => {
+      if (!pz.cur || pz.state === 'solved' || pz.state === 'failed') return;
+      pz.hinted = true;
+      const want = pz.cur.line[pz.step * 2];
+      if (want) GameUI.setHint(want.split('-')[0]);
+      $('pz-note').textContent = 'Hint used: this puzzle will not raise your rating.';
+    });
+    $('pz-solution').addEventListener('click', () => {
+      startCurrent(true);
+      GameUI.setPuzzleMessage('Solution', '');
+      GameUI.playLine(pz.cur.line, () => GameUI.setPuzzleMessage('That was the solution.', ''));
+    });
+  }
+  async function openPuzzles() {
+    closeGame();
+    if (!pz.bank.length) { toast('No puzzles are available.'); return; }
+    if (online && user && !pz.attemptLoaded) {
+      pz.attemptLoaded = true;
+      try { (await q(sb.from('puzzle_attempts').select('puzzle_id').eq('player', user.id))).forEach((r) => pz.attemptedIds.add(r.puzzle_id)); } catch (e) { /* table missing until update-003 */ }
+    }
+    if (online && !pz.ratingsLoaded) {
+      pz.ratingsLoaded = true;
+      try { (await q(sb.from('puzzles').select('id,rating'))).forEach((r) => (pz.ratings[r.id] = r.rating)); } catch (e) { /* keep built-in ratings */ }
+    }
+    if (GameUI.kind() === 'puzzle' && pz.cur && pz.state === 'progress') { show('game'); return; }
+    nextPuzzle();
+  }
+  function pickPuzzle() {
+    const target = myPzRating() + (+$('pz-diff').value || 0);
+    const done = new Set([...pz.local.seen, ...pz.attemptedIds]);
+    let pool = pz.bank.filter((p) => !done.has(p.id));
+    if (!pool.length) { pz.local.seen = []; saveLocalPz(); pool = pz.bank.slice(); }
+    pool.sort((a, b) => Math.abs(pzRating(a) - target) - Math.abs(pzRating(b) - target));
+    const near = pool.slice(0, 8);
+    return near[Math.floor(Math.random() * near.length)];
+  }
+  function nextPuzzle() {
+    pz.cur = pickPuzzle(); pz.retry = false;
+    startCurrent();
+    show('game');
+  }
+  function startCurrent(forSolution) {
+    const p = pz.cur;
+    pz.step = 0; pz.moves = []; pz.hinted = pz.hinted && pz.retry; pz.state = forSolution ? 'shown' : 'fresh';
+    if (!pz.retry) pz.hinted = false;
+    const side = p.key[0] === 'b' ? 'b' : 'w';
+    GameUI.startPuzzle({ key: p.key, side, onMove: (str) => onPuzzleMove(str) });
+    $('pz-goal').textContent = `${side === 'w' ? 'White' : 'Black'} to move: ${GOAL[p.type]}`;
+    if (!forSolution) GameUI.setPuzzleMessage(`${side === 'w' ? 'White' : 'Black'}: ${GOAL[p.type]}`, '');
+    $('pz-id').textContent = 'Puzzle ' + p.id.replace(/^p/, '#');
+    $('pz-rating').textContent = 'Rated ' + pzRating(p);
+    $('pz-result').textContent = ''; $('pz-result').className = '';
+    $('pz-note').textContent = pz.retry ? 'Retry: practice only, your rating will not change.' : '';
+    $('pz-retry').hidden = true; $('pz-solution').hidden = true; $('pz-hint').hidden = !!forSolution;
+    renderPzStats();
+  }
+  function renderPzStats() {
+    $('pz-my').textContent = myPzRating();
+    $('pz-streak').textContent = pz.local.streak;
+    $('pz-solved').textContent = serverPz() && profile.puzzles_solved != null ? profile.puzzles_solved : pz.local.solved;
+  }
+  // replays the puzzle start plus `moves` on a fresh engine state
+  function replay(moves) {
+    const s = Rules.stateFromKey(pz.cur.key);
+    for (const str of moves) { const m = Rules.moveFromString(s, str); if (!m) return null; Rules.makeMove(s, m); }
+    return s;
+  }
+  async function onPuzzleMove(str) {
+    const p = pz.cur;
+    if (pz.state === 'fresh') pz.state = 'progress';
+    pz.moves.push(str);
+    const after = replay(pz.moves);
+    let ok = false, done = false, reply = null;
+    if (p.type === 'mate1') { ok = PuzzleLogic.isMate(after); done = ok; }
+    else if (pz.step === 0) {
+      ok = (p.alts || [p.line[0]]).includes(str);
+      if (ok) reply = str === p.line[0] ? p.line[1] : S(p.type === 'mate2' ? PuzzleLogic.toughestReply(after) : PuzzleLogic.bestDefence(after, 0));
+    } else if (p.type === 'mate2') { ok = PuzzleLogic.isMate(after); done = ok; }
+    else {
+      const before = replay(pz.moves.slice(0, -1)), side = before.turn;
+      const base = PuzzleLogic.material(replay([]), side);
+      let best = -Infinity;
+      for (const m of Rules.legalMoves(before)) best = Math.max(best, PuzzleLogic.valueAfter(before, m, 0));
+      const mine = PuzzleLogic.search(after, 0, -Infinity, Infinity, side);
+      ok = mine >= best - 0.5 && mine - base >= 2.5; done = ok;
+    }
+    if (!ok) { finishPuzzle(false); return { result: 'wrong' }; }
+    if (done) { finishPuzzle(true); return { result: 'solved' }; }
+    pz.moves.push(reply); pz.step += 1;
+    $('pz-result').textContent = 'Correct. Keep going.'; $('pz-result').className = 'ok';
+    GameUI.setPuzzleMessage('Correct. Keep going.', 'ok');
+    return { result: 'continue', reply };
+  }
+  async function finishPuzzle(solved, label) {
+    const p = pz.cur;
+    pz.state = solved ? 'solved' : 'failed';
+    GameUI.setHint(null);
+    GameUI.setPuzzleMessage(solved ? 'Solved!' : (label || 'Not quite.'), solved ? 'ok' : 'err');
+    $('pz-result').className = solved ? 'ok' : 'err';
+    $('pz-retry').hidden = solved; $('pz-solution').hidden = solved; $('pz-hint').hidden = true;
+    const rated = !pz.retry;
+    const score = solved && !pz.hinted;
+    if (rated) {
+      pz.local.attempted++;
+      if (score) { pz.local.solved++; pz.local.streak++; } else pz.local.streak = 0;
+      if (!pz.local.seen.includes(p.id)) pz.local.seen.push(p.id);
+      if (pz.local.seen.length > 2000) pz.local.seen = pz.local.seen.slice(-2000);
+    }
+    let text = solved ? (pz.hinted ? 'Solved with a hint.' : 'Solved!') : (label || 'Not quite.');
+    if (rated) {
+      let change = null, newRating = null;
+      if (online && user) {
+        try {
+          const res = asRow(await rpc('record_puzzle', { p_puzzle: p.id, p_solved: score }));
+          if (res && res.rated) {
+            change = res.rating_change; newRating = res.new_rating;
+            if (profile) { profile.puzzle_rating = newRating; profile.puzzles_solved = res.puzzles_solved; }
+            if (res.puzzle_rating != null) pz.ratings[p.id] = res.puzzle_rating;
+          }
+          pz.attemptedIds.add(p.id);
+        } catch (e) {
+          // before update-003 is run the function is missing: keep the rating on this device instead
+          if (!/could not find|does not exist|schema cache/i.test(errMsg(e))) { toast(errMsg(e)); change = 0; newRating = myPzRating(); }
+        }
+      }
+      if (change == null) {
+        const pr = pzRating(p), me = pz.local.rating;
+        const e = 1 / (1 + Math.pow(10, (pr - me) / 400));
+        change = Math.round(24 * ((score ? 1 : 0) - e));
+        if (score) change = Math.max(1, change);
+        pz.local.rating = Math.max(100, me + change); newRating = pz.local.rating;
+      }
+      text += ` Puzzle rating ${signed(change)} (now ${newRating}).`;
+    } else text += ' Practice attempt, rating unchanged.';
+    saveLocalPz();
+    $('pz-result').textContent = text;
+    renderPzStats();
+  }
+
   // ---------- bots: rated games and the learned playbook ----------
   const playbookCache = new Map();
   async function fetchPlaybook(key) {
@@ -394,7 +579,7 @@ const App = (() => {
     } catch (e) { out.textContent = errMsg(e); }
   }
   function playVsBot() {
-    if (!og && !GameUI.isOnline() && GameUI.moveCount() > 0) { show('game'); return; }   // continue the local game
+    if (!og && GameUI.kind() === 'local' && GameUI.moveCount() > 0) { show('game'); return; }   // continue the local game
     closeGame();
     $('opponent').value = 'computer';
     GameUI.newLocal();

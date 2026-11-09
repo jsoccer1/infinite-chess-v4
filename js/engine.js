@@ -515,8 +515,32 @@ const Rules = (() => {
     return s.turn + '|' + lists.w.sort().join(',') + '|' + lists.b.sort().join(',') + '|' + rights;
   }
 
+  // Builds a game state from a playbook key (used for puzzles). Pawns on their starting
+  // cells may still double-step; castling rights come from the key's last field.
+  function stateFromKey(key) {
+    const [turn, wl, bl, rights] = String(key).split('|');
+    const s = emptyGame();
+    s.turn = turn === 'b' ? 'b' : 'w';
+    for (const [c, list] of [['w', wl], ['b', bl]]) {
+      for (const e of (list || '').split(',').filter(Boolean)) {
+        const [t, cell] = e.split('@');
+        if (!(cell in IDX) || !'KQRBNP'.includes(t)) throw new Error('Bad position key');
+        const start = t === 'P' && SETUP[c].P.includes(cell);
+        s.board[IDX[cell]] = { t, c, moved: t === 'P' ? !start : true };
+      }
+    }
+    for (const c of ['w', 'b']) {
+      if (!(rights || '').includes(c === 'w' ? 'W' : 'B')) continue;
+      const C = CASTLE[c], k = s.board[C.k], r = s.board[C.r];
+      if (k && k.t === 'K' && k.c === c) k.moved = false;
+      if (r && r.t === 'R' && r.c === c) r.moved = false;
+    }
+    s.posCounts[positionKey(s)] = 1;
+    return s;
+  }
+
   return { NAMES, IDX, NUM, config, Patterns, PAWN, PROMO_DIST, VALUES, ORTHO_LINES, DIAG_LINES, ONE_STEP, LEAP,
-    moveToString, moveFromString, playbookKey,
+    moveToString, moveFromString, playbookKey, stateFromKey,
     newGame, emptyGame, findKing, isAttacked, attacksOf, inCheck, pseudoMoves, legalMoves, makeMove, unmakeMove,
     playMove, undoLast, status, isPromoCell, positionKey };
 })();

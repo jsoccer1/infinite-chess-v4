@@ -10,7 +10,7 @@ Chess on a 72-cell figure-8 board, by Mark Colebank. The game runs as a static s
 - Pawns move toward the other loop. White promotes on a cell numbered 15, Black on a cell numbered 4.
 - Once a pawn enters the 16-cell center diamond it can never move back into the loop it came from (for example White R10 to Q1 or Black Q9 to R18).
 - Bishops, queens and kings can cross diagonally over the tip of each center hole: R7 to R1 and Q12 to Q18. Pawns and knights cannot.
-- The board shows vertically by default (White at the bottom). Game settings let each player switch to horizontal, change board colors and piece colors, and resize the board. These choices are saved on the device.
+- The board shows vertically by default (White at the bottom) with the Tournament colors. Game settings let each player switch to horizontal, change board colors and piece colors, and resize the board. These choices are saved on the device.
 - Checkmate wins. Stalemate and threefold repetition are draws.
 - Video walkthrough: https://youtu.be/NuzgnSQVKGU?si=BK_mP7PERFE9E7Qv
 - Add `#test` to the URL to run the built-in rules test suite in the browser.
@@ -32,6 +32,16 @@ Server rules worth knowing:
 - The server checks turn order and move format, but only the browsers run the full rules, so a modified client could send a legal-looking but illegal move. The other player's browser then shows "Game out of sync".
 
 If `config.js` still has its placeholders, or Supabase cannot be reached, the site shows a small "Online features not configured" or "Offline" banner, hides the online menu items, and bot play keeps working.
+
+## Puzzles
+
+The Puzzles tab serves positions from real engine games with one goal each: checkmate in 1, checkmate in 2, or win material. `js/puzzle-bank.js` holds 670 puzzles that were found in engine self-play and re-checked by `js/puzzles.js` (the same solver the page uses to accept alternative solutions). Players have a separate puzzle rating that starts at 1000; puzzles are picked near it, shifted by the Easiest to Hardest setting, so they get harder as the player improves. Each puzzle's rating also moves as players solve or miss it. Only the first attempt at a puzzle is rated, and a hint makes it count as a miss. Guests keep their puzzle rating on their device.
+
+Existing projects: run `supabase/update-003-puzzles.sql` once. New projects get it from `setup.sql`.
+
+## Updating the site
+
+`version.json` and the `app-version` tag in `index.html` must match. When you publish a change, raise both numbers (and the `?v=` tags on the scripts). Open copies, including Home Screen apps, see the newer `version.json` and reload themselves once.
 
 ## Install as an app
 

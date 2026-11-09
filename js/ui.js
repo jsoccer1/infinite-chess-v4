@@ -37,9 +37,9 @@ const GameUI = (() => {
     ivory:   { name: 'Ivory and Ebony', w: { fill: '#fff4dc', stroke: '#6b4e1e' }, b: { fill: '#2b1d14', stroke: '#e9c88a' } },
   };
   const PREF_KEY = 'ic_prefs';
-  const prefs = Object.assign({ orient: 'vertical', theme: 'classic', pieces: 'classic', size: 100, names: false },
+  const prefs = Object.assign({ orient: 'vertical', theme: 'tournament', pieces: 'classic', size: 100, names: false },
     (() => { try { return JSON.parse(localStorage.getItem(PREF_KEY) || '{}'); } catch (e) { return {}; } })());
-  if (!THEMES[prefs.theme]) prefs.theme = 'classic';
+  if (!THEMES[prefs.theme] || !prefs.themeChosen) prefs.theme = 'tournament';   // Tournament unless the player picked a theme
   if (!PIECE_SETS[prefs.pieces]) prefs.pieces = 'classic';
   prefs.size = Math.min(140, Math.max(60, +prefs.size || 100));
   function savePrefs() { try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch (e) { /* private mode */ } }
@@ -121,6 +121,7 @@ const GameUI = (() => {
     if (h) { fillCell(R.NAMES[h.undo.m.from], C.last); fillCell(R.NAMES[h.undo.m.to], C.last); }
     if (st.status && st.status.check) { const k = R.findKing(st.game, st.game.turn); if (k >= 0) fillCell(R.NAMES[k], C.check); }
     if (st.selected != null) fillCell(R.NAMES[st.selected], C.accent + '99');
+    if (st.hint != null) { fillCell(R.NAMES[st.hint], C.accent + '66'); strokeCell(R.NAMES[st.hint], C.accent, 3); }
 
     // the two holes, drawn on top in the background colour
     for (const c of [Ge.CL, Ge.CR]) { pathPoly(Ge.holePoints(c)); ctx.fillStyle = C.bg; ctx.fill(); }
@@ -158,33 +159,43 @@ const GameUI = (() => {
     }
   }
   function drawPiece(name, p) { drawPieceAt(LABEL[name], p); }
-  // Chess glyphs carry uneven side bearings in most fonts, so centre the visible ink, not the text box.
-  const inkCache = new Map();
-  function inkOffset(g, px) {
-    const key = g + '|' + Math.round(px * 10);
-    let o = inkCache.get(key);
-    if (!o) {
-      const m = ctx.measureText(g);
-      o = (m.actualBoundingBoxAscent || m.actualBoundingBoxDescent)
-        ? { dx: (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2, dy: (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2 }
-        : { dx: 0, dy: px * 0.35 };
-      inkCache.set(key, o);
-    }
-    return o;
+  // Chess glyphs come from different fonts on different devices (Apple, Google, Microsoft) and
+  // each places the symbol differently inside its text box. So each piece is drawn once onto a
+  // small off-screen canvas, its visible pixels are measured, and that ink box is centred in
+  // the cell. This works the same in every browser, including Safari on iPhone.
+  const spriteCache = new Map();
+  function pieceSprite(p, px) {
+    const dpr = view.dpr || 1, set = PIECE_SETS[prefs.pieces][p.c];
+    const key = p.t + p.c + prefs.pieces + '|' + Math.round(px * dpr);
+    let sp = spriteCache.get(key);
+    if (sp) return sp;
+    const fpx = px * dpr, size = Math.ceil(fpx * 1.8) + 4;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.font = `${fpx}px ${PIECE_FONT}`;
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    g.lineWidth = Math.max(1.5 * dpr, fpx * 0.075);
+    g.strokeStyle = set.stroke; g.fillStyle = set.fill;
+    const glyph = GLYPH[p.t] + VS;
+    g.strokeText(glyph, size / 2, size / 2);
+    g.fillText(glyph, size / 2, size / 2);
+    let cx = size / 2, cy = size / 2;
+    try {
+      const d = g.getImageData(0, 0, size, size).data;
+      let x0 = size, y0 = size, x1 = -1, y1 = -1;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        if (d[(y * size + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 >= 0) { cx = (x0 + x1 + 1) / 2; cy = (y0 + y1 + 1) / 2; }
+    } catch (e) { /* keep the text-box centre */ }
+    sp = { c, cx, cy, dpr };
+    spriteCache.set(key, sp);
+    return sp;
   }
   function drawPieceAt(pt, p) {
     const s = toScreen(pt), px = PIECE_UNITS * view.sc;   // one size for every piece on every cell
-    const set = PIECE_SETS[prefs.pieces][p.c];
-    ctx.font = `${px}px ${PIECE_FONT}`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    const g = GLYPH[p.t] + VS, o = inkOffset(g, px);
-    const x = s.x + o.dx, y = s.y + o.dy;
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(1.5, px * 0.075);
-    ctx.strokeStyle = set.stroke;
-    ctx.strokeText(g, x, y);
-    ctx.fillStyle = set.fill;
-    ctx.fillText(g, x, y);
+    const sp = pieceSprite(p, px);
+    ctx.drawImage(sp.c, s.x - sp.cx / sp.dpr, s.y - sp.cy / sp.dpr, sp.c.width / sp.dpr, sp.c.height / sp.dpr);
   }
 
   // ---------- game logic ----------
@@ -199,6 +210,7 @@ const GameUI = (() => {
   function canInteract() {
     if (st.thinking || st.promo || st.anim || st.status.over) return false;
     if (session.kind === 'online') return !session.locked && !session.pending && !session.finished && st.game.turn === session.myColor;
+    if (session.kind === 'puzzle') return !session.locked && !session.busy && st.game.turn === session.side;
     if (vsBot() && st.game.turn !== st.humanColor) return false;
     return true;
   }
@@ -248,6 +260,8 @@ const GameUI = (() => {
     if (m.promo) movers.push({ piece: before[m.from], from: m.from, to: m.to });
 
     if (session.kind === 'online' && !opts.remote) sendOnline(str, plyBefore);
+    if (session.kind === 'puzzle' && !opts.remote) sendPuzzle(str);
+    st.hint = null;
 
     const finish = () => { st.anim = null; refreshStatus(); render(); afterMove(); };
     if (reduceMotion.matches || !movers.length) { finish(); return; }
@@ -271,6 +285,7 @@ const GameUI = (() => {
   }
 
   function afterMove() {
+    if (session.kind === 'puzzle') { const f = session.afterAnim; session.afterAnim = null; if (f) f(); return; }
     if (session.kind === 'local') {
       if (vsBot() && st.status.over && !session.reported && hooks.onLocalGameOver) {
         session.reported = true;
@@ -370,7 +385,7 @@ const GameUI = (() => {
   function resetBoard() {
     session.token = {};
     st.anim = null; st.thinking = false; st.promo = null; showPromo(false);
-    st.game = R.newGame(); st.moveStrs = []; st.entries = []; st.selected = null; st.targets = []; st.botNote = '';
+    st.game = R.newGame(); st.moveStrs = []; st.entries = []; st.selected = null; st.targets = []; st.botNote = ''; st.hint = null;
   }
 
   function newLocal() {
@@ -398,6 +413,50 @@ const GameUI = (() => {
   }
   function setOnlineFinished(flag) { if (session.kind === 'online') { session.finished = flag; st.selected = null; st.targets = []; render(); } }
 
+  // ---------- puzzle sessions ----------
+  // opts: { key, side: 'w'|'b', onMove(str) -> Promise<{ result: 'continue'|'solved'|'wrong', reply? }> }
+  function startPuzzle(opts) {
+    resetBoard();
+    st.game = R.stateFromKey(opts.key);
+    session = { kind: 'puzzle', side: opts.side, onMove: opts.onMove, locked: false, busy: false, msg: '', tone: '', afterAnim: null, token: session.token };
+    st.flipped = opts.side === 'b';
+    refreshStatus(); render(); resize();
+  }
+  function sendPuzzle(str) {
+    session.busy = true; render();
+    const token = session.token;
+    Promise.resolve(session.onMove(str)).then((res) => {
+      if (token !== session.token || session.kind !== 'puzzle') return;
+      const go = () => {
+        if (res && res.result === 'continue' && res.reply) {
+          setTimeout(() => {
+            if (token !== session.token) return;
+            const m = R.moveFromString(st.game, res.reply);
+            session.afterAnim = () => { session.busy = false; render(); };
+            if (m) commit(m, { remote: true }); else { session.busy = false; render(); }
+          }, 380);
+        } else { session.busy = false; if (res && res.result !== 'continue') session.locked = true; render(); }
+      };
+      if (st.anim) session.afterAnim = go; else go();
+    }, () => { session.busy = false; render(); });
+  }
+  function setPuzzleMessage(msg, tone) { if (session.kind === 'puzzle') { session.msg = msg || ''; session.tone = tone || ''; render(); } }
+  function setHint(cell) { st.hint = cell ? R.IDX[cell] : null; draw(); }
+  // replays a list of moves from the current position with the normal animation
+  function playLine(moves, done) {
+    const token = session.token;
+    session.locked = true; session.busy = true;
+    const next = (i) => {
+      if (token !== session.token) return;
+      if (i >= moves.length) { session.busy = false; render(); if (done) done(); return; }
+      const m = R.moveFromString(st.game, moves[i]);
+      if (!m) { session.busy = false; render(); return; }
+      session.afterAnim = () => setTimeout(() => next(i + 1), 420);
+      commit(m, { remote: true });
+    };
+    setTimeout(() => next(0), 300);
+  }
+
   function showPromo(open) {
     const dlg = $('promo');
     if (!open) { dlg.hidden = true; return; }
@@ -415,13 +474,18 @@ const GameUI = (() => {
 
   // ---------- sidebar ----------
   function render() {
-    const s = st.status, g = st.game, online = session.kind === 'online';
-    $('local-controls').hidden = online;
+    const s = st.status, g = st.game, online = session.kind === 'online', puzzle = session.kind === 'puzzle';
+    $('local-controls').hidden = online || puzzle;
     $('online-controls').hidden = !online;
-    $('opp-block').hidden = online;
+    $('puzzle-controls').hidden = !puzzle;
+    $('opp-block').hidden = online || puzzle;
     document.body.classList.toggle('in-online-game', online);
+    document.body.classList.toggle('in-puzzle', puzzle);
     let msg, sub = '';
-    if (online && session.locked) { msg = session.lockMsg; sub = 'Input is stopped. Reload the page to resync.'; }
+    if (puzzle) {
+      msg = session.msg || (session.busy ? 'Checking\u2026' : g.turn === session.side ? 'Your move' : 'Opponent is replying\u2026');
+      sub = s.check && !s.over ? (g.turn === session.side ? 'You are in check.' : 'Check!') : '';
+    } else if (online && session.locked) { msg = session.lockMsg; sub = 'Input is stopped. Reload the page to resync.'; }
     else if (s.over) {
       if (s.result === 'checkmate') msg = online ? (s.winner === session.myColor ? 'Checkmate. You win.' : 'Checkmate. You lose.') : `Checkmate. ${sideName(s.winner)} wins.`;
       else if (s.result === 'stalemate') msg = 'Stalemate. The game is a draw.';
@@ -439,7 +503,8 @@ const GameUI = (() => {
     $('status').textContent = msg;
     $('status-sub').textContent = sub;
     $('status-sub').classList.toggle('alert', !!s.check && !s.over);
-    $('turn-chip').className = 'chip ' + (s.over || (online && session.locked) ? 'over' : g.turn);
+    $('turn-chip').className = 'chip ' + (s.over || (online && session.locked) || (puzzle && session.locked) ? 'over' : g.turn);
+    $('status').dataset.tone = puzzle ? session.tone : '';
     $('bot-note').textContent = vsBot() ? st.botNote : '';
     const h = g.history, rows = [];
     for (let i = 0; i < h.length; i += 2) rows.push(`<li><span>${h[i].note}</span><span>${h[i + 1] ? h[i + 1].note : ''}</span></li>`);
@@ -453,7 +518,8 @@ const GameUI = (() => {
       const list = cap[c].sort((a, b) => ord.indexOf(a.t) - ord.indexOf(b.t)).map((p) => `<span class="glyph ${p.c}">${GLYPH[p.t]}${VS}</span>`).join('');
       $('cap-' + c).innerHTML = list || '<span class="muted">None yet</span>';
     }
-    if (!online) {
+    if (puzzle) $('vs-line').hidden = true;
+    if (!online && !puzzle) {
       $('undo').disabled = !h.length || st.thinking || !!st.anim;
       $('m-undo').disabled = $('undo').disabled;
       $('ai-opts').hidden = !vsBot();
@@ -511,6 +577,7 @@ const GameUI = (() => {
   $('m-undo').addEventListener('click', () => $('undo').click());
   $('m-flip').addEventListener('click', () => { st.flipped = !st.flipped; draw(); });
   $('m-settings').addEventListener('click', () => setSheet(true));
+  $('m-next').addEventListener('click', () => $('pz-next').click());
   $('sheet-done').addEventListener('click', () => setSheet(false));
   $('sheet-backdrop').addEventListener('click', () => setSheet(false));
   $('sheet-new').addEventListener('click', () => { setSheet(false); newLocal(); });
@@ -529,11 +596,11 @@ const GameUI = (() => {
     $('board-size-val').textContent = prefs.size + '%';
   }
   document.querySelectorAll('[data-orient]').forEach((b) => b.addEventListener('click', () => { prefs.orient = b.dataset.orient; savePrefs(); renderAppearance(); resize(); }));
-  $('theme-swatches').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-key]'); if (!b) return; prefs.theme = b.dataset.themeKey; savePrefs(); renderAppearance(); draw(); });
+  $('theme-swatches').addEventListener('click', (e) => { const b = e.target.closest('[data-theme-key]'); if (!b) return; prefs.theme = b.dataset.themeKey; prefs.themeChosen = true; savePrefs(); renderAppearance(); draw(); });
   $('piece-swatches').addEventListener('click', (e) => { const b = e.target.closest('[data-piece-key]'); if (!b) return; prefs.pieces = b.dataset.pieceKey; savePrefs(); renderAppearance(); draw(); });
   $('board-size').addEventListener('input', (e) => { prefs.size = +e.target.value; $('board-size-val').textContent = prefs.size + '%'; resize(); });
   $('board-size').addEventListener('change', savePrefs);
-  $('appearance-reset').addEventListener('click', () => { Object.assign(prefs, { orient: 'vertical', theme: 'classic', pieces: 'classic', size: 100 }); savePrefs(); renderAppearance(); resize(); });
+  $('appearance-reset').addEventListener('click', () => { Object.assign(prefs, { orient: 'vertical', theme: 'tournament', themeChosen: false, pieces: 'classic', size: 100 }); savePrefs(); renderAppearance(); resize(); });
   renderAppearance();
   $('opponent').addEventListener('change', (e) => {
     taint();
@@ -561,7 +628,7 @@ const GameUI = (() => {
   }
 
   refreshStatus(); render();
-  if (document.fonts) document.fonts.ready.then(draw);
+  if (document.fonts) document.fonts.ready.then(() => { spriteCache.clear(); draw(); });
 
   return {
     setHooks: (h) => { hooks = Object.assign(hooks, h); render(); },
@@ -571,6 +638,9 @@ const GameUI = (() => {
     refresh: () => render(),
     runLoader,
     isOnline: () => session.kind === 'online',
+    kind: () => session.kind,
+    startPuzzle, setPuzzleMessage, setHint, playLine,
+    state: () => st.game,
     entries: () => st.entries.slice(0, 200),
     moveCount: () => st.moveStrs.length,
   };
